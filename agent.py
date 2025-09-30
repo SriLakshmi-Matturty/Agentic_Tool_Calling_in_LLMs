@@ -1,22 +1,7 @@
 import json
 from tools import CalculatorTool, SearchTool, KnowledgeBaseTool
 from prompt_manager import PromptManager
-
-# Replace with any LLM wrapper (OpenAI, HuggingFace, etc.)
-class DummyLLM:
-    def generate(self, prompt: str) -> str:
-        """
-        Dummy implementation for testing.
-        In practice, call OpenAI/HF model here.
-        Should return a JSON plan.
-        """
-        # Example hardcoded plan for testing
-        if "Weng earns $12 an hour" in prompt:
-            return '[{"tool": "calculator", "query": "12/60"}, {"tool": "calculator", "query": "0.2*50"}]'
-        if "president of France" in prompt:
-            return '[{"tool": "search", "query": "President of France"}]'
-        return "[]"
-
+from hf_llm import HFLLM
 
 class Agent:
     def __init__(self, llm):
@@ -54,7 +39,7 @@ class Agent:
 
 
 if __name__ == "__main__":
-    llm = DummyLLM()
+    llm = HFLLM("mistralai/Mistral-7B-Instruct-v0.2")
     agent = Agent(llm)
 
     # Example GSM8K test

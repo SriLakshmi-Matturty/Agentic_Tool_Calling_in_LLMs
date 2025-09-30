@@ -1,29 +1,52 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
+# from transformers import AutoModelForCausalLM, AutoTokenizer
+# import torch
+
+# class HFLLM:
+#     def __init__(self, model_name="mistralai/Mistral-7B-Instruct-v0.2", device=None):
+#         print(f"Loading {model_name}...")
+#         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+#         self.model = AutoModelForCausalLM.from_pretrained(
+#             model_name,
+#             device_map="auto",
+#             torch_dtype=torch.float16,
+#         )
+#         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+
+#     def generate(self, prompt: str) -> str:
+#         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
+#         outputs = self.model.generate(
+#             **inputs,
+#             max_new_tokens=256,
+#             do_sample=True,
+#             temperature=0.3,
+#         )
+#         decoded = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+#         # Try to extract JSON block if present
+#         if "[" in decoded and "]" in decoded:
+#             decoded = decoded[decoded.find("["):decoded.rfind("]")+1]
+
+#         return decoded
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, AutoModelForCausalLM
 
 class HFLLM:
-    def __init__(self, model_name="mistralai/Mistral-7B-Instruct-v0.2", device=None):
-        print(f"Loading {model_name}...")
+    def __init__(self, model_name="google/flan-t5-base"):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            device_map="auto",
-            torch_dtype=torch.float16,
-        )
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
-    def generate(self, prompt: str) -> str:
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
-        outputs = self.model.generate(
-            **inputs,
-            max_new_tokens=256,
-            do_sample=True,
-            temperature=0.3,
-        )
-        decoded = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        # Decide automatically based on model type
+        if "t5" in model_name.lower() or "flan" in model_name.lower():
+            self.model = AutoModelForSeq2SeqLM.from_pretrained(
+                model_name,
+                device_map="auto",
+            )
+        else:
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                device_map="auto",
+            )
 
-        # Try to extract JSON block if present
-        if "[" in decoded and "]" in decoded:
-            decoded = decoded[decoded.find("["):decoded.rfind("]")+1]
+    def generate(self, prompt: str, max_new_tokens: int = 128) -> str:
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        outputs = self.model.generate(**inputs, max_new_tokens=max_new_tokens)
+        return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-        return decoded

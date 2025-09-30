@@ -39,7 +39,7 @@ class Agent:
 
 
 if __name__ == "__main__":
-    llm = HFLLM("mistralai/Mistral-7B-Instruct-v0.2")
+    llm = HFLLM("google/flan-t5-base")
     agent = Agent(llm)
 
     # Example GSM8K test

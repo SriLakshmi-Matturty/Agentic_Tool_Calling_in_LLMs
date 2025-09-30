@@ -1,5 +1,68 @@
-<<<<<<< HEAD
- 
-=======
+import json
+from tools import CalculatorTool, SearchTool, KnowledgeBaseTool
+from prompt_manager import PromptManager
 
->>>>>>> 49b2ffb987c87cf494ca5fbf18cd76e9ae8965e6
+# Replace with any LLM wrapper (OpenAI, HuggingFace, etc.)
+class DummyLLM:
+    def generate(self, prompt: str) -> str:
+        """
+        Dummy implementation for testing.
+        In practice, call OpenAI/HF model here.
+        Should return a JSON plan.
+        """
+        # Example hardcoded plan for testing
+        if "Weng earns $12 an hour" in prompt:
+            return '[{"tool": "calculator", "query": "12/60"}, {"tool": "calculator", "query": "0.2*50"}]'
+        if "president of France" in prompt:
+            return '[{"tool": "search", "query": "President of France"}]'
+        return "[]"
+
+
+class Agent:
+    def __init__(self, llm):
+        self.llm = llm
+        self.prompt_manager = PromptManager()
+        self.tools = {
+            "calculator": CalculatorTool(),
+            "search": SearchTool(),
+            "knowledge_base": KnowledgeBaseTool(),
+        }
+
+    def answer(self, question: str):
+        # Step 1: Get plan from LLM
+        prompt = self.prompt_manager.build_prompt(question)
+        raw_plan = self.llm.generate(prompt)
+
+        try:
+            plan = json.loads(raw_plan)
+        except Exception as e:
+            return f"Error parsing LLM output: {e}\nOutput was: {raw_plan}"
+
+        # Step 2: Execute tool calls
+        results = []
+        for step in plan:
+            tool_name = step.get("tool")
+            query = step.get("query")
+            tool = self.tools.get(tool_name)
+            if tool:
+                results.append(tool.run(query))
+            else:
+                results.append(f"Unknown tool: {tool_name}")
+
+        # Step 3: Return final result
+        return results[-1] if results else "No answer"
+
+
+if __name__ == "__main__":
+    llm = DummyLLM()
+    agent = Agent(llm)
+
+    # Example GSM8K test
+    q1 = "Weng earns $12 an hour for babysitting. Yesterday, she just did 50 minutes of babysitting. How much did she earn?"
+    print("Q:", q1)
+    print("A:", agent.answer(q1))
+
+    # Example WebQuestions test
+    q2 = "Who is the president of France?"
+    print("\nQ:", q2)
+    print("A:", agent.answer(q2))

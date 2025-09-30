@@ -18,7 +18,12 @@ class Agent:
         prompt = self.prompt_manager.build_prompt(question)
         raw_plan = self.llm.generate(prompt)
 
+        # Step 1.5: Try to extract/repair JSON
         try:
+            # Extract JSON-like part using regex
+            match = re.search(r"\[.*\]", raw_plan, re.DOTALL)
+            if match:
+                raw_plan = match.group(0)
             plan = json.loads(raw_plan)
         except Exception as e:
             return f"Error parsing LLM output: {e}\nOutput was: {raw_plan}"

@@ -3,17 +3,15 @@ import sympy as sp
 
 class CalculatorTool:
     name = "calculator"
-    description = "Execute simple and complex math calculations using Python/Sympy."
+    description = "Execute simple and complex math calculations using Sympy/Python."
 
     def run(self, query: str):
         try:
-            # Try safe sympy evaluation first
             expr = sp.sympify(query)
             result = expr.evalf()
             return str(result)
         except Exception:
             try:
-                # Fallback: Python eval
                 return str(eval(query))
             except Exception as e:
                 return f"Error: {e}"
@@ -21,7 +19,7 @@ class CalculatorTool:
 
 class SearchTool:
     name = "search"
-    description = "Query factual information from Wikipedia."
+    description = "Query factual information from Wikipedia API."
 
     def run(self, query: str):
         try:
@@ -37,7 +35,7 @@ class SearchTool:
 
 class KnowledgeBaseTool:
     name = "knowledge_base"
-    description = "Lookup from a local or custom knowledge base (placeholder)."
+    description = "Lookup from a custom/local knowledge base (placeholder)."
 
     def run(self, query: str):
         return f"No custom KB implemented yet. Query was: {query}"

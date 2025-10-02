@@ -11,35 +11,43 @@ class Agent:
         self.tools = tools
 
     def run(self, question: str) -> str:
-        # Step 1: Prompt the LLM
-        prompt = self.prompt_manager.build_prompt(question)
-        raw_plan = self.llm.generate(prompt)
+    # Step 1: Prompt the LLM
+    prompt = self.prompt_manager.build_prompt(question)
+    raw_plan = self.llm.generate(prompt)
 
+    try:
+        plan = json.loads(raw_plan)
+    except json.JSONDecodeError:
+        # Retry with stricter instructions
+        retry_prompt = self.prompt_manager.build_prompt(
+            question + " (Respond ONLY with valid JSON!)"
+        )
+        raw_plan = self.llm.generate(retry_prompt)
         try:
             plan = json.loads(raw_plan)
         except json.JSONDecodeError:
             return f"Error: Invalid JSON from LLM\nGot: {raw_plan}"
 
-        # Step 2: Execute the plan
-        results = []
-        for step in plan:
-            tool_name = step.get("tool")
-            query = step.get("query", "")
-            tool = self.tools.get(tool_name)
+    # Step 2: Execute the plan
+    results = []
+    for step in plan:
+        tool_name = step.get("tool")
+        query = step.get("query", "")
+        tool = self.tools.get(tool_name)
 
-            if tool:
-                result = tool.run(query)
-                results.append({"tool": tool_name, "query": query, "result": result})
-            else:
-                results.append({"tool": tool_name, "query": query, "result": "Unknown tool"})
+        if tool:
+            result = tool.run(query)
+            results.append({"tool": tool_name, "query": query, "result": result})
+        else:
+            results.append({"tool": tool_name, "query": query, "result": "Unknown tool"})
 
-        return results
+    return results
 
 
 if __name__ == "__main__":
     # Initialize everything
     pm = PromptManager()
-    llm = HFLLM(model_name="EleutherAI/gpt-neo-2.7B", device=0)  # GPU recommended
+    llm = HFLLM(model_name="EleutherAI/gpt-neo-125M", device=0)  # GPU recommended
     tools = {
         "calculator": CalculatorTool(),
         "search": SearchTool(),

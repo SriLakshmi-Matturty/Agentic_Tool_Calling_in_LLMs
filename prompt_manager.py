@@ -12,8 +12,15 @@ class PromptManager:
         ]
         """
         return f"""
-You are a tool-calling planner. 
-Return only valid JSON. No explanations.
+You are a tool-calling planner.
+You must return ONLY valid JSON, nothing else.
+Use this format:
+[
+  {{"tool": "calculator", "query": "2+2"}},
+  {{"tool": "search", "query": "President of France"}}
+]
 
 Question: {question}
+Answer:
 """
+

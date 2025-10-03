@@ -28,20 +28,20 @@ class Agent:
             except json.JSONDecodeError:
                 return f"Error: Invalid JSON from LLM\nGot: {raw_plan}"
 
-    # Step 2: Execute the plan
-    results = []
-    for step in plan:
-        tool_name = step.get("tool")
-        query = step.get("query", "")
-        tool = self.tools.get(tool_name)
-
-        if tool:
-            result = tool.run(query)
-            results.append({"tool": tool_name, "query": query, "result": result})
-        else:
-            results.append({"tool": tool_name, "query": query, "result": "Unknown tool"})
-
-    return results
+        # Step 2: Execute the plan
+        results = []
+        for step in plan:
+            tool_name = step.get("tool")
+            query = step.get("query", "")
+            tool = self.tools.get(tool_name)
+    
+            if tool:
+                result = tool.run(query)
+                results.append({"tool": tool_name, "query": query, "result": result})
+            else:
+                results.append({"tool": tool_name, "query": query, "result": "Unknown tool"})
+    
+        return results
 
 
 if __name__ == "__main__":

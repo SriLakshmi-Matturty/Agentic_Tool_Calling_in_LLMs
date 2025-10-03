@@ -16,10 +16,13 @@ class CalculatorTool:
 class SearchTool:
     def run(self, query: str) -> str:
         try:
-            # Wikipedia summary API
             url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{query.replace(' ', '_')}"
-            response = requests.get(url, timeout=5)
-
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                              "AppleWebKit/537.36 (KHTML, like Gecko) "
+                              "Chrome/140.0.0.0 Safari/537.36"
+            }
+            response = requests.get(url, headers=headers, timeout=5)
             if response.status_code == 200:
                 data = response.json()
                 return data.get("extract", "No summary available.")
@@ -27,6 +30,7 @@ class SearchTool:
                 return f"Wikipedia Error: HTTP {response.status_code}"
         except Exception as e:
             return f"Wikipedia Error: {e}"
+
 
 
 class KnowledgeBaseTool:

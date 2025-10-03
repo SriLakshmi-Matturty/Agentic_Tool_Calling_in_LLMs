@@ -1,4 +1,5 @@
 import re
+import requests
 import wikipedia
 
 class CalculatorTool:
@@ -16,12 +17,17 @@ class CalculatorTool:
 class SearchTool:
     def run(self, query: str) -> str:
         try:
-            summary = wikipedia.summary(query, sentences=2)
-            return summary
-        except wikipedia.DisambiguationError as e:
-            return f"Multiple results found: {e.options[:5]}"
+            # Wikipedia summary API
+            url = f"https://en.wikipedia.org/api/rest_v1/page/summary/{query.replace(' ', '_')}"
+            response = requests.get(url, timeout=5)
+
+            if response.status_code == 200:
+                data = response.json()
+                return data.get("extract", "No summary available.")
+            else:
+                return f"Wikipedia Error: HTTP {response.status_code}"
         except Exception as e:
-            return f"Search Error: {e}"
+            return f"Wikipedia Error: {e}"
 
 
 class KnowledgeBaseTool:

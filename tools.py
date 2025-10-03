@@ -4,12 +4,8 @@ import requests
 class CalculatorTool:
     def run(self, query: str) -> str:
         try:
-            # Handle "X items for Y$" → unit rate
-            match = re.match(r"(\d+)\s+\w+\s+for\s+(\d+)\$", query.lower())
-            if match:
-                qty, price = map(int, match.groups())
-                return f"{price/qty:.2f} per item"
-            return str(eval(query, {}, {}))
+            result = eval(query, {"__builtins__": {}}, {})
+            return str(int(result) if isinstance(result, float) and result.is_integer() else result)
         except Exception as e:
             return f"Calculator Error: {e}"
 

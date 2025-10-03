@@ -1,4 +1,5 @@
 import re
+import wikipedia
 
 class CalculatorTool:
     def run(self, query: str) -> str:
@@ -14,12 +15,14 @@ class CalculatorTool:
 
 class SearchTool:
     def run(self, query: str) -> str:
-        q = query.lower()
-        if "president of france" in q:
-            return "Emmanuel Macron"
-        if "president of india" in q:
-            return "Droupadi Murmu"
-        return f"(Mock Search) No search results for '{query}'"
+        try:
+            summary = wikipedia.summary(query, sentences=2)
+            return summary
+        except wikipedia.DisambiguationError as e:
+            return f"Multiple results found: {e.options[:5]}"
+        except Exception as e:
+            return f"Search Error: {e}"
+
 
 class KnowledgeBaseTool:
     def run(self, query: str) -> str:

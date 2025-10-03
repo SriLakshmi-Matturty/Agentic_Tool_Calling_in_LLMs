@@ -33,26 +33,18 @@ import re
 
 class HFLLM:
     def __init__(self, model_name="EleutherAI/gpt-neo-2.7B", device=-1):
-        """
-        Hugging Face LLM wrapper.
-        device=-1 → CPU, device=0 → GPU
-        """
-        self.generator = pipeline("text-generation", model=model_name, device=device)
+        self.generator = pipeline(
+            "text-generation",
+            model=model_name,
+            device=device,
+            return_full_text=False
+        )
 
     def generate(self, prompt: str) -> str:
         out = self.generator(
             prompt,
-            max_new_tokens=150,
+            max_new_tokens=200,
             do_sample=False,
-            eos_token_id=50256  # stop early
+            eos_token_id=50256
         )[0]["generated_text"]
-    
-        # Remove the prompt itself (keep only generated continuation)
-        new_text = out[len(prompt):].strip()
-    
-        # Extract the first valid JSON block
-        match = re.search(r"\[[\s\S]*?\]", new_text)
-        if match:
-            return match.group(0)
-        return "[]"
-
+        return out.strip()

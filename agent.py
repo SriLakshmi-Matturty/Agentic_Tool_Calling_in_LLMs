@@ -47,7 +47,7 @@ class Agent:
 if __name__ == "__main__":
     # Initialize everything
     pm = PromptManager()
-    llm = HFLLM(model_name="EleutherAI/gpt-neo-125M", device=0)  # GPU recommended
+    llm = HFLLM(model_name="EleutherAI/gpt-neo-1.3B", device=0)  # GPU recommended
     tools = {
         "calculator": CalculatorTool(),
         "search": SearchTool(),

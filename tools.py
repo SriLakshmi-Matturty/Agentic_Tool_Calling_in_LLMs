@@ -22,3 +22,11 @@ class KnowledgeBaseTool:
         }
         return kb.get(query, f"No knowledge found for '{query}'")
 
+class Toolset(dict):
+    def __init__(self):
+        super().__init__({
+            "calculator": CalculatorTool(),
+            "search": SearchTool(),
+            "knowledge_base": KnowledgeBaseTool(),
+        })
+

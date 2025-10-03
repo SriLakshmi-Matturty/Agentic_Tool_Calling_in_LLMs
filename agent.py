@@ -1,7 +1,7 @@
 # agent.py
 import json
+import re
 from prompt_manager import PromptManager
-from tools import CalculatorTool, SearchTool, KnowledgeBaseTool
 from hf_llm import HFLLM
 
 class Agent:
@@ -11,58 +11,34 @@ class Agent:
         self.tools = tools
 
     def run(self, question: str) -> str:
-        # Step 1: Prompt the LLM
-        prompt = self.prompt_manager.build_prompt(question)
-        raw_plan = self.llm.generate(prompt)
-    
-        try:
-            plan = json.loads(raw_plan)
-        except json.JSONDecodeError:
-            # Retry with stricter instructions
-            retry_prompt = self.prompt_manager.build_prompt(
-                question + " (Respond ONLY with valid JSON!)"
-            )
-            raw_plan = self.llm.generate(retry_prompt)
-            try:
-                plan = json.loads(raw_plan)
-            except json.JSONDecodeError:
-                return f"Error: Invalid JSON from LLM\nGot: {raw_plan}"
+        # Step 1: Ask LLM for tool plan
+        tool_prompt = self.prompt_manager.build_tool_prompt(question)
+        raw_plan = self.llm.generate(tool_prompt)
 
-        # Step 2: Execute the plan
+        # Extract JSON safely
+        match = re.search(r"\[[\s\S]*?\]", raw_plan)
+        if not match:
+            return f"Error: No valid JSON plan\nGot: {raw_plan}"
+        try:
+            plan = json.loads(match.group(0))
+        except:
+            return f"Error: Invalid JSON\nGot: {raw_plan}"
+
+        # Step 2: Execute tools
         results = []
         for step in plan:
             tool_name = step.get("tool")
             query = step.get("query", "")
             tool = self.tools.get(tool_name)
-    
             if tool:
                 result = tool.run(query)
                 results.append({"tool": tool_name, "query": query, "result": result})
             else:
                 results.append({"tool": tool_name, "query": query, "result": "Unknown tool"})
-    
-        return results
 
+        # Step 3: Ask LLM for final natural answer
+        final_prompt = self.prompt_manager.build_final_answer_prompt(question, results)
+        final_answer = self.llm.generate(final_prompt)
 
-if __name__ == "__main__":
-    # Initialize everything
-    pm = PromptManager()
-    llm = HFLLM(model_name="EleutherAI/gpt-neo-2.7B", device=0)  # GPU recommended
-    tools = {
-        "calculator": CalculatorTool(),
-        "search": SearchTool(),
-        "knowledge_base": KnowledgeBaseTool(),
-    }
-    agent = Agent(llm, pm, tools)
-
-    # User input loop
-    while True:
-        question = input("\nAsk me a question (or type 'exit'): ")
-        if question.lower() == "exit":
-            break
-
-        output = agent.run(question)
-        print("\n--- Results ---")
-        for step in output:
-            print(f"[{step['tool']}] {step['query']} -> {step['result']}")
+        return final_answer
 

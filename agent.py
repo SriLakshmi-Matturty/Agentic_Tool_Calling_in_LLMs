@@ -14,19 +14,19 @@ class Agent:
         # Step 1: Prompt the LLM
         prompt = self.prompt_manager.build_prompt(question)
         raw_plan = self.llm.generate(prompt)
-
-    try:
-        plan = json.loads(raw_plan)
-    except json.JSONDecodeError:
-        # Retry with stricter instructions
-        retry_prompt = self.prompt_manager.build_prompt(
-            question + " (Respond ONLY with valid JSON!)"
-        )
-        raw_plan = self.llm.generate(retry_prompt)
+    
         try:
             plan = json.loads(raw_plan)
         except json.JSONDecodeError:
-            return f"Error: Invalid JSON from LLM\nGot: {raw_plan}"
+            # Retry with stricter instructions
+            retry_prompt = self.prompt_manager.build_prompt(
+                question + " (Respond ONLY with valid JSON!)"
+            )
+            raw_plan = self.llm.generate(retry_prompt)
+            try:
+                plan = json.loads(raw_plan)
+            except json.JSONDecodeError:
+                return f"Error: Invalid JSON from LLM\nGot: {raw_plan}"
 
     # Step 2: Execute the plan
     results = []

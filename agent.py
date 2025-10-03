@@ -35,10 +35,13 @@ class Agent:
                 results.append({"tool": tool_name, "query": query, "result": result})
             else:
                 results.append({"tool": tool_name, "query": query, "result": "Unknown tool"})
-
+        
+        # If only one tool result and it's short, return it directly
+        if len(results) == 1 and len(results[0]["result"]) < 100:
+            return results[0]["result"]
+        
         # Step 3: Ask LLM for final natural answer
         final_prompt = self.prompt_manager.build_final_answer_prompt(question, results)
         final_answer = self.llm.generate(final_prompt)
-
         return final_answer
 

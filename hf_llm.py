@@ -47,4 +47,6 @@ class HFLLM:
             do_sample=False,
             eos_token_id=50256
         )[0]["generated_text"]
-        return out.strip()
+        # Remove prompt text to avoid repetition
+        final_answer = out.replace(prompt, "").strip()
+        return final_answer

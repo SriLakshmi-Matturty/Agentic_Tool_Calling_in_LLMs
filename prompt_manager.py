@@ -33,12 +33,14 @@ Answer:
         Step 2: Build final answer prompt.
         The LLM must now use tool results to produce the final natural-language answer.
         """
-        return f"""
+        return return f"""
 You are an assistant that answers questions using tool results.
+ONLY return the final answer, no extra text.
 
 Question: {question}
 Tool Results: {tool_results}
 
 Answer:
 """
+
 

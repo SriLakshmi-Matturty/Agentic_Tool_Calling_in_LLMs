@@ -1,6 +1,5 @@
 import re
 import requests
-import wikipedia
 
 class CalculatorTool:
     def run(self, query: str) -> str:

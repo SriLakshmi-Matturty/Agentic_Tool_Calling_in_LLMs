@@ -29,6 +29,7 @@
 #         return decoded
 # hf_llm.py
 from transformers import pipeline
+import re
 
 class HFLLM:
     def __init__(self, model_name="EleutherAI/gpt-neo-2.7B", device=-1):
@@ -39,11 +40,19 @@ class HFLLM:
         self.generator = pipeline("text-generation", model=model_name, device=device)
 
     def generate(self, prompt: str) -> str:
-        out = self.generator(prompt, max_new_tokens=150, do_sample=False)[0]["generated_text"]
-
-        # Extract JSON between [ and ]
-        start, end = out.find("["), out.rfind("]") + 1
-        if start != -1 and end != -1:
-            return out[start:end]
+        out = self.generator(
+            prompt,
+            max_new_tokens=150,
+            do_sample=False,
+            eos_token_id=50256  # stop early
+        )[0]["generated_text"]
+    
+        # Remove the prompt itself (keep only generated continuation)
+        new_text = out[len(prompt):].strip()
+    
+        # Extract the first valid JSON block
+        match = re.search(r"\[[\s\S]*?\]", new_text)
+        if match:
+            return match.group(0)
         return "[]"
 

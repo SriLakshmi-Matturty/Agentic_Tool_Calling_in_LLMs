@@ -11,9 +11,9 @@ class Agent:
         self.tools = tools
 
     def run(self, question: str) -> str:
-    # Step 1: Prompt the LLM
-    prompt = self.prompt_manager.build_prompt(question)
-    raw_plan = self.llm.generate(prompt)
+        # Step 1: Prompt the LLM
+        prompt = self.prompt_manager.build_prompt(question)
+        raw_plan = self.llm.generate(prompt)
 
     try:
         plan = json.loads(raw_plan)

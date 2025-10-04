@@ -3,38 +3,43 @@ class PromptManager:
     def build_tool_prompt(self, question: str) -> str:
         return f"""
 You are a tool planner.
-Decide which tool to use: "calculator" or "search".
+Choose tools from: "calculator" or "search".
 
 Rules:
-- If the question is about math, prices, quantities, units → use "calculator".
-- When using calculator, rewrite the question into a clean Python math expression.
-  Example: "Priyansh bought 3 chocolates for 15$, cost for 25?" → "25*(15/3)"
-- If the question is about facts, people, places, science, history → use "search".
+- For math, prices, or quantities → use calculator.
+- Rewrite word problems into correct math expressions.
+- For factual questions (people, history, science) → use search.
+- Output JSON only, no text outside JSON.
 
-Return ONLY valid JSON. Do not explain. Do not add extra text.
+Examples:
 
-Example 1:
-Question: What is 2+3?
-Answer:
+Q: What is 2+3?
+A:
 [{{"tool": "calculator", "query": "2+3"}}]
 
-Example 2:
-Question: Who is the president of India?
-Answer:
+Q: Priyansh bought 3 chocolates for 15$, what is the cost for 25?
+A:
+[{{"tool": "calculator", "query": "25*(15/3)"}}]
+
+Q: Who is the president of India?
+A:
 [{{"tool": "search", "query": "President of India"}}]
 
-Question: {question}
-Answer:
+Now do the same:
+
+Q: {question}
+A:
 """
 
     def build_final_prompt(self, question: str, tool_results: list) -> str:
         return f"""
 You are a helpful assistant.
-The user asked: "{question}"
 
-You have access to these tool results:
+User question: "{question}"
+
+Tool results:
 {tool_results}
 
-Write a clear final answer for the user. Be concise and correct.
+Write the final answer clearly and concisely for the user.
+Do NOT repeat instructions or JSON. Only output the answer.
 """
-

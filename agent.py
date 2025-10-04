@@ -34,7 +34,22 @@ class Agent:
                 results.append({"tool": tool_name, "query": query, "result": "Unknown tool"})
 
         # Step 4: Final Answer
-        final_prompt = self.prompt_manager.build_final_prompt(question, results)
-        final_answer = self.llm.generate(final_prompt)
-        return final_answer.strip()
+         if results:
+        final_prompt = f"""
+Question: {question}
 
+Tool Results:
+{json.dumps(results, indent=2)}
+
+Write the final answer clearly and concisely for the user.
+Do NOT include instructions, JSON, or tool details in the output.
+"""
+    else:
+        final_prompt = f"""
+Question: {question}
+
+Write the final answer clearly and concisely for the user.
+"""
+
+    final_answer = self.llm.generate(final_prompt)
+    return final_answer.strip()

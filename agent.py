@@ -1,4 +1,6 @@
 # agent.py
+import re, json
+
 class Agent:
     def __init__(self, llm, prompt_manager, tools):
         self.llm = llm
@@ -10,16 +12,16 @@ class Agent:
         tool_prompt = self.prompt_manager.build_tool_prompt(question)
         raw_plan = self.llm.generate(tool_prompt)
 
-        # Step 2: Parse JSON
+        # Step 2: Extract JSON
         match = re.search(r"\[[\s\S]*?\]", raw_plan)
         if not match:
-            return f"Error: No valid JSON plan\nGot: {raw_plan}"
+            return f"❌ Tool planner failed. Raw output:\n{raw_plan}"
         try:
             plan = json.loads(match.group(0))
         except Exception as e:
-            return f"Error: Invalid JSON\nGot: {raw_plan}\nError: {e}"
+            return f"❌ Invalid JSON from LLM\n{raw_plan}\nError: {e}"
 
-        # Step 3: Execute tools
+        # Step 3: Execute Tools
         results = []
         for step in plan:
             tool_name = step.get("tool")
@@ -31,7 +33,8 @@ class Agent:
             else:
                 results.append({"tool": tool_name, "query": query, "result": "Unknown tool"})
 
-        # Step 4: Final natural answer
+        # Step 4: Final Answer
         final_prompt = self.prompt_manager.build_final_prompt(question, results)
         final_answer = self.llm.generate(final_prompt)
         return final_answer.strip()
+

@@ -1,18 +1,20 @@
 # prompt_manager.py
-
 class PromptManager:
     def build_tool_prompt(self, question: str) -> str:
         return f"""
 You are a tool planner.
-Decide which tool to use: "calculator" or "search".
+You must decide which tool to call.
+
+Allowed tools:
+- "calculator"
+- "search"
 
 Rules:
-- If the question is about math, prices, quantities, units → use "calculator".
-- When using calculator, rewrite the question into a clean Python math expression.
-  Example: "Priyansh bought 3 chocolates for 15$, cost for 25?" → "25*(15/3)"
+- If the question is about math, numbers, quantities, units → use "calculator".
+- Rewrite into a valid Python math expression.
 - If the question is about facts, people, places, science, history → use "search".
 
-Return ONLY valid JSON.
+⚠️ IMPORTANT: Return ONLY valid JSON. Do NOT explain.
 
 Example 1:
 Question: What is 2+3?
@@ -41,12 +43,11 @@ Answer:
 
     def build_answer_prompt(self, question: str, tool_results: list) -> str:
         return f"""
-You are a helpful assistant. A user asked: "{question}"
+The user asked: "{question}"
 
-You had access to tools. Here are their results:
-{tool_results}
+Tool results: {tool_results}
 
-Now, write the FINAL answer in natural language.
-Keep it short and direct.
+Now, give the final short answer in plain language. 
+Do not repeat the tool logs, just the answer.
 """
 

@@ -39,3 +39,14 @@ Question: {question}
 Answer:
 """
 
+    def build_answer_prompt(self, question: str, tool_results: list) -> str:
+        return f"""
+You are a helpful assistant. A user asked: "{question}"
+
+You had access to tools. Here are their results:
+{tool_results}
+
+Now, write the FINAL answer in natural language.
+Keep it short and direct.
+"""
+

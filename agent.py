@@ -21,7 +21,7 @@ class Agent:
             return f"Error: No valid JSON plan\nGot: {raw_plan}"
         try:
             plan = json.loads(match.group(0))
-        except:
+        except Exception:
             return f"Error: Invalid JSON\nGot: {raw_plan}"
 
         # Step 2: Execute tools
@@ -35,13 +35,13 @@ class Agent:
                 results.append({"tool": tool_name, "query": query, "result": result})
             else:
                 results.append({"tool": tool_name, "query": query, "result": "Unknown tool"})
-        
-        # If only one tool result and it's short, return it directly
-        if len(results) == 1 and len(results[0]["result"]) < 100:
+
+        # Step 3: If only one result (and simple), return directly
+        if len(results) == 1 and isinstance(results[0]["result"], str) and len(results[0]["result"]) < 100:
             return results[0]["result"]
-        
-        # Step 3: Ask LLM for final natural answer
-        final_prompt = self.prompt_manager.build_tool_prompt(question, results)
+
+        # Step 4: Build final natural language answer
+        final_prompt = self.prompt_manager.build_answer_prompt(question, results)
         final_answer = self.llm.generate(final_prompt)
         return final_answer
 

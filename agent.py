@@ -18,11 +18,12 @@ class Agent:
         # Extract JSON safely
         match = re.search(r"\[[\s\S]*?\]", raw_plan)
         if not match:
-            return f"Error: No valid JSON plan\nGot: {raw_plan}"
+            return f"Tool planning failed. Raw output:\n{raw_plan}"
+        
         try:
             plan = json.loads(match.group(0))
-        except Exception:
-            return f"Error: Invalid JSON\nGot: {raw_plan}"
+        except Exception as e:
+            return f"Error: Invalid JSON\nGot: {raw_plan}\nError: {e}"
 
         # Step 2: Execute tools
         results = []
@@ -43,5 +44,5 @@ class Agent:
         # Step 4: Build final natural language answer
         final_prompt = self.prompt_manager.build_answer_prompt(question, results)
         final_answer = self.llm.generate(final_prompt)
-        return final_answer
+        return final_answer.strip()
 

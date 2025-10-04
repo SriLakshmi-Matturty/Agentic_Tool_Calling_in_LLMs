@@ -2,7 +2,7 @@
 from transformers import pipeline
 
 class HFLLM:
-    def __init__(self, model_name="EleutherAI/gpt-neo-2.7B", device=-1):
+    def __init__(self, model_name="google/flan-t5-base", device=-1):
         self.generator = pipeline(
             "text-generation",
             model=model_name,

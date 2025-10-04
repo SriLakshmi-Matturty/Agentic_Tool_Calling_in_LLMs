@@ -1,4 +1,5 @@
 # agent.py
+# agent.py
 import re, json
 
 class Agent:
@@ -34,22 +35,15 @@ class Agent:
                 results.append({"tool": tool_name, "query": query, "result": "Unknown tool"})
 
         # Step 4: Final Answer
-         if results:
-        final_prompt = f"""
-Question: {question}
+        # 🚨 Keep the prompt minimal
+        final_prompt = f"Q: {question}\nA: Based on the tool results {results}, the final answer is:"
 
-Tool Results:
-{json.dumps(results, indent=2)}
+        raw_answer = self.llm.generate(final_prompt).strip()
 
-Write the final answer clearly and concisely for the user.
-Do NOT include instructions, JSON, or tool details in the output.
-"""
-    else:
-        final_prompt = f"""
-Question: {question}
+        # 🚨 Post-process to keep only clean answer (remove echoes of "Tool results", "You are", etc.)
+        cleaned = re.sub(r"(?i)you are.*", "", raw_answer)  # drop repeated instructions
+        cleaned = re.sub(r"(?i)tool results.*", "", cleaned)  # drop tool dump
+        cleaned = cleaned.strip()
 
-Write the final answer clearly and concisely for the user.
-"""
+        return cleaned if cleaned else raw_answer
 
-    final_answer = self.llm.generate(final_prompt)
-    return final_answer.strip()

@@ -3,8 +3,11 @@ import requests
 class CalculatorTool:
     def run(self, query: str) -> str:
         try:
-            result = eval(query, {"__builtins__": {}}, {})
-            return str(int(result) if isinstance(result, float) and result.is_integer() else result)
+            expr = query.replace("$","")  # remove $ signs etc
+            result = eval(expr, {"__builtins__": {}}, {})
+            if isinstance(result, float) and result.is_integer():
+                result = int(result)
+            return str(result)
         except Exception as e:
             return f"Calculator Error: {e}"
 

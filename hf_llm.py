@@ -1,5 +1,5 @@
 # hf_llm.py
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
 class HFLLM:
@@ -10,8 +10,11 @@ class HFLLM:
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
 
-    def generate(self, prompt, max_new_tokens=100):
+    def generate(self, prompt: str, max_new_tokens=80):
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
-        outputs = self.model.generate(**inputs, max_new_tokens=max_new_tokens)
+        outputs = self.model.generate(**inputs, max_new_tokens=max_new_tokens, do_sample=False)
         text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        return text
+        # Remove prompt prefix if model echoes prompt back
+        if text.startswith(prompt):
+            text = text[len(prompt):].strip()
+        return text.strip()

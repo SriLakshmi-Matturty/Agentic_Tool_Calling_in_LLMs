@@ -12,11 +12,10 @@ class Agent:
         }
 
     def decide_tool(self, query: str) -> str:
-        # Simple rule-based tool selection
-        if any(op in query for op in ["+", "-", "*", "/", "sqrt", "power", "sin", "cos", "tan", "^"]):
+        # Rule-based tool decision
+        if any(op in query for op in ["+", "-", "*", "/", "sqrt", "power", "sin", "cos", "tan", "^", "log"]):
             return "calculator"
-        else:
-            return "wikipedia"
+        return "wikipedia"
 
     def run(self, query: str) -> str:
         tool_name = self.decide_tool(query)
@@ -26,8 +25,11 @@ class Agent:
         result = tool.run(query)
         print(f"🔍 Tool result: {result}\n")
 
-        prompt = PromptManager.build_prompt(f"Question: {query}\nTool result: {result}\nFinal Answer:")
+        prompt = PromptManager.build_prompt(query, result)
         response = self.llm.generate(prompt)
+
+        # Clean LLM output (remove repeated question text)
+        response = response.replace(query, "").strip()
         return response
 
 if __name__ == "__main__":

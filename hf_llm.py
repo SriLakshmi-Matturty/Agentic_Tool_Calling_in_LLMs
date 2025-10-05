@@ -17,7 +17,6 @@ class HuggingFaceLLM:
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
         outputs = self.model.generate(**inputs, max_new_tokens=max_new_tokens)
         text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        # If model echoes prompt, drop the prompt prefix
         if text.startswith(prompt):
             text = text[len(prompt):].strip()
         return text.strip()

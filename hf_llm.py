@@ -3,7 +3,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 import torch
 
 class HuggingFaceLLM:
-    def __init__(self, model_name="google/gemma-2b-it"):
+    def __init__(self, model_name="EleutherAI/gpt-neo-2.7"):
         print(f"Loading model: {model_name}...")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(

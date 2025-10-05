@@ -1,15 +1,15 @@
 # prompt_manager.py
-
 class PromptManager:
     @staticmethod
-    def build_prompt(query: str) -> str:
-        return f"""You are a helpful AI agent with access to tools.
+    def build_prompt(question: str, tool_result: str) -> str:
+        return f"""You are a helpful AI agent that answers user questions using tools.
 
-You can use:
-1. Calculator – for math
-2. Wikipedia – for factual or web-based questions
+Tool Outputs:
+{tool_result}
 
-Decide which tool to use and respond concisely.
+Now based on the above tool result, provide a **final concise and factual answer** to the following question.
 
-Question: {query}
+Question: {question}
+
+Answer only with the final factual response. Do not repeat the question or mention tools.
 """

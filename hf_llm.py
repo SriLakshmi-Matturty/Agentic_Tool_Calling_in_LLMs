@@ -20,4 +20,4 @@ class HuggingFaceLLM:
         # If model echoes prompt, drop the prompt prefix
         if text.startswith(prompt):
             text = text[len(prompt):].strip()
-        return text.strip()
+        return text.strip()

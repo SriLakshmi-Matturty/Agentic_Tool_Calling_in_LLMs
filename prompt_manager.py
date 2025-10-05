@@ -11,4 +11,4 @@ class PromptManager:
             f"Tool output:\n{tool_result_summary}\n\n"
             f"Question: {question}\n\n"
             f"Write a concise factual answer (one or two sentences)."
-        )
+        )

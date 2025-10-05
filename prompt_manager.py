@@ -1,15 +1,13 @@
 # prompt_manager.py
 class PromptManager:
     @staticmethod
-    def build_prompt(question: str, tool_result: str) -> str:
-        return f"""You are a helpful AI agent that answers user questions using tools.
-
-Tool Outputs:
-{tool_result}
-
-Now based on the above tool result, provide a **final concise and factual answer** to the following question.
-
-Question: {question}
-
-Answer only with the final factual response. Do not repeat the question or mention tools.
-"""
+    def build_final_prompt(question: str, tool_result_summary: str) -> str:
+        """
+        Minimal prompt for an LLM to synthesize a final answer when needed.
+        """
+        return (
+            f"Use ONLY the information below (do not invent facts).\n\n"
+            f"Tool output:\n{tool_result_summary}\n\n"
+            f"Question: {question}\n\n"
+            f"Write a concise factual answer (one or two sentences)."
+        )

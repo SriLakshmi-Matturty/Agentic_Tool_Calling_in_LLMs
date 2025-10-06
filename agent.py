@@ -3,13 +3,13 @@ import re
 import json
 from hf_llm import HuggingFaceLLM
 from prompt_manager import PromptManager
-from tools import CalculatorTool, SearchTool  # or your Search/Wikipedia tool
+from tools import CalculatorTool, WikipediaTool
 
 class Agent:
-    def __init__(self, use_llm_for_fallback=False, llm_model="TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
+    def _init_(self, use_llm_for_fallback=False, llm_model="TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
         self.tools = {
             "calculator": CalculatorTool(),
-            "search": SearchTool()
+            "wikipedia": WikipediaTool()
         }
         self.use_llm_for_fallback = use_llm_for_fallback
         if use_llm_for_fallback:
@@ -18,126 +18,120 @@ class Agent:
             self.llm = None
 
     def decide_tool(self, question: str) -> str:
-        q = question.lower().strip()
-
-        # 1) explicit person-name/questions -> search
-        if re.match(r'^(who\s+is|who\'s|who\s+was|who\s+are|what\s+is\s+the\s+name|name of)', q):
-            return "search"
-        if "prime minister" in q or "president" in q or "ceo" in q or "mayor" in q:
-            # prefer search for roles
-            return "search"
-
-        # 2) Likely math/word problem -> calculator
-        math_triggers = [
-            "per", "each", "every", "total", "sum", "difference", "times", "multiply",
-            "add", "subtract", "sell", "sold", "profit", "cost", "paid", "left",
-            "remaining", "per day", "per week", "bolts", "takes", "eggs", "muffin", "runs",
-            "%", "percent", "meters", "miles", "$"
-        ]
-        if re.search(r'\d', q) or any(t in q for t in math_triggers):
+        q = question.lower()
+        # If explicit arithmetic or expression present
+        if re.search(r'\d+\s*[\+\-\\/\^]\s\d+', q):
             return "calculator"
+        # Proportion/price style word problems -> calculator
+        if any(w in q for w in ["cost", "price", "paid", "how much", "how many", "total", "worth", "dollars", "$", "rupees"]):
+            # if question contains at least 2 numbers it's likely arithmetic/proportion
+            nums = re.findall(r'\d+\.?\d*', q)
+            if len(nums) >= 2:
+                return "calculator"
+        # otherwise treat as factual -> wikipedia
+        return "wikipedia"
 
-        # default -> search
-        return "search"
+    def _solve_proportion(self, question: str):
+        """
+        Basic heuristic: if question contains exactly 3 numbers like [a, b, c],
+        and form matches "a items for b$, ... for c items", compute c*(b/a).
+        """
+        nums = re.findall(r'\d+\.?\d*', question)
+        if len(nums) >= 3:
+            a = float(nums[0])
+            b = float(nums[1])
+            c = float(nums[2])
+            # compute c * (b / a)
+            try:
+                val = c * (b / a)
+                if val.is_integer():
+                    val = int(val)
+                return str(val)
+            except Exception:
+                return None
+        return None
 
     def _extract_expression(self, question: str):
-        """Tries to extract inline arithmetic expressions like '17 * 24'."""
-        m = re.search(r'(\d+(?:\.\d*)?)\s*([\+\-\*\/\^])\s*(\d+(?:\.\d*)?)', question)
+        """
+        If question includes an inline arithmetic expression like '17 * 24' return it.
+        """
+        m = re.search(r'(\d+(?:\.\d*)?)\s*([\+\-\\/\^])\s(\d+(?:\.\d*)?)', question)
         if m:
             a, op, b = m.group(1), m.group(2), m.group(3)
             expr = f"{a}{op}{b}"
-            expr = expr.replace('^', '**')
+            expr = expr.replace('^', '')
             return expr
-        return None
-
-    def _call_llm_for_expression(self, question: str):
-        """Use LLM to convert a word problem into a single python expression."""
-        if not self.llm:
-            return None
-        prompt = (
-            "Convert the following math word problem into ONE valid Python expression that computes the final numeric answer.\n"
-            "Output ONLY the expression (no explanation). Use numbers exactly as they appear.\n\n"
-            f"Problem: {question}\n\nExpression:"
-        )
-        out = self.llm.generate(prompt, max_new_tokens=128)
-        if not out:
-            return None
-        # take the first non-empty line
-        expr = out.strip().splitlines()[0].strip()
-        # normalize percent (e.g., 150% -> (150/100))
-        expr = re.sub(r'(\d+(?:\.\d+)?)\s*%', r'(\1/100)', expr)
-        # sanitize: keep common arithmetic chars
-        expr = re.sub(r'[^0-9\.\+\-\*\/\(\)\s\%]', '', expr)
-        expr = expr.replace('^', '**')
-        return expr
-
-    def _simple_numeric_fallback(self, question: str):
-        """Very small fallback heuristics: multiply all numbers when question implies repeated events."""
-        nums = re.findall(r'\d+(?:\.\d+)?', question)
-        nums = [float(n) for n in nums]
-        if not nums:
-            return None
-        q = question.lower()
-        if any(k in q for k in ["each", "per", "every", "times", "runs", "sprints", "per day", "per week"]):
-            prod = 1
-            for n in nums:
-                prod *= n
-            # if integer-like
-            if prod.is_integer():
-                return str(int(prod))
-            return str(prod)
-        # default: if exactly two numbers, multiply them (simple)
-        if len(nums) == 2:
-            val = nums[0] * nums[1]
-            if val.is_integer():
-                return str(int(val))
-            return str(val)
         return None
 
     def run(self, question: str) -> str:
         tool_name = self.decide_tool(question)
-
         # Calculator path
         if tool_name == "calculator":
-            # 1) explicit inline expression
+            # 1) Try to extract explicit expression
             expr = self._extract_expression(question)
             if expr:
-                return self.tools["calculator"].run(expr)
-
-            # 2) try LLM to rewrite into expression (if enabled)
+                out = self.tools["calculator"].run(expr)
+                return out
+            # 2) Proportion heuristic (common in GSM8K)
+            prop = self._solve_proportion(question)
+            if prop is not None:
+                return prop
+            # 3) Fall back: attempt to extract numbers and do simple operations: if 2 numbers -> maybe division or multiplication?
+            nums = re.findall(r'\d+\.?\d*', question)
+            if len(nums) == 2:
+                # guess: maybe a per-unit price: "Weng earns $12 an hour ... 50 minutes" -> convert minutes to hours
+                # handle special case: minutes/hours
+                if "minute" in question or "minutes" in question:
+                    try:
+                        pay_per_hour = float(nums[0])
+                        minutes = float(nums[1])
+                        val = pay_per_hour * (minutes / 60.0)
+                        if val.is_integer():
+                            val = int(val)
+                        return str(val)
+                    except Exception:
+                        pass
+                # default: multiply?
+                try:
+                    val = float(nums[0]) * float(nums[1])
+                    if val.is_integer():
+                        val = int(val)
+                    return str(val)
+                except Exception:
+                    pass
+            # If still not resolved, optionally use LLM to produce expression (if enabled)
             if self.use_llm_for_fallback and self.llm:
-                expr = self._call_llm_for_expression(question)
-                if expr:
-                    out = self.tools["calculator"].run(expr)
-                    # If calculator fails but expression looked ok, return the raw expr for debugging
-                    if out.startswith("Calculator Error"):
-                        return f"Expr: {expr} -> {out}"
-                    return out
-
-            # 3) small numeric fallback heuristics
-            fallback = self._simple_numeric_fallback(question)
-            if fallback is not None:
-                return fallback
-
+                prompt = f"Rewrite this question as a single Python arithmetic expression only (no text):\nQuestion: {question}\nExpression:"
+                expr_text = self.llm.generate(prompt, max_new_tokens=64)
+                expr_text = expr_text.strip().splitlines()[0]
+                # try to sanitize and evaluate
+                expr_text = expr_text.replace('^', '')
+                out = self.tools["calculator"].run(expr_text)
+                return out
             return "Calculator: unable to parse the arithmetic expression from the question."
 
-        # Search / factual path
-        if tool_name == "search":
-            raw = self.tools["search"].run(question)
+        # Wikipedia / factual path
+        if tool_name == "wikipedia":
+            raw = self.tools["wikipedia"].run(question)
+            # raw is JSON-string according to our tool
             try:
                 parsed = json.loads(raw)
             except Exception:
                 return f"Search error: {raw}"
 
             if parsed.get("type") == "person":
+                # If question is a 'Who is the <role> of <entity>' we try to craft a natural short answer
                 m = re.search(r'who\s+is\s+the\s+(.+?)\s+of\s+([^\?\.]+)', question, flags=re.I)
                 if m:
                     role = m.group(1).strip()
                     entity = m.group(2).strip()
                     name = parsed.get("name")
+                    # e.g., "Droupadi Murmu is the president of India."
                     return f"{name} is the {role} of {entity}."
+                # otherwise return name + short summary
                 return f"{parsed.get('name')}: {parsed.get('summary').split('.')[0]}."
             elif parsed.get("type") == "summary":
+                # return the first sentence of the summary as a concise answer
                 summary = parsed.get("summary", "")
                 first = summary.split('. ')[0].strip()
                 if not first.endswith('.'):
@@ -145,6 +139,5 @@ class Agent:
                 return first
             else:
                 return parsed.get("message", "No result found.")
-
         return "Unhandled case."
-
+    

@@ -6,7 +6,7 @@ from prompt_manager import PromptManager
 from tools import CalculatorTool, SearchTool
 
 class Agent:
-    def _init_(self, use_llm_for_fallback=False, llm_model="TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
+    def __init__(self, use_llm_for_fallback=False, llm_model="TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
         self.tools = {
             "calculator": CalculatorTool(),
             "wikipedia": SearchTool()

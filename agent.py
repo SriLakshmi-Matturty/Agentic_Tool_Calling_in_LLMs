@@ -3,13 +3,13 @@ import re
 import json
 from hf_llm import HuggingFaceLLM
 from prompt_manager import PromptManager
-from tools import CalculatorTool, WikipediaTool
+from tools import CalculatorTool, SearchTool
 
 class Agent:
     def _init_(self, use_llm_for_fallback=False, llm_model="TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
         self.tools = {
             "calculator": CalculatorTool(),
-            "wikipedia": WikipediaTool()
+            "wikipedia": SearchTool()
         }
         self.use_llm_for_fallback = use_llm_for_fallback
         if use_llm_for_fallback:
@@ -25,7 +25,7 @@ class Agent:
             nums = re.findall(r'\d+\.?\d*', q)
             if len(nums) >= 2:
                 return "calculator"
-        return "wikipedia"
+        return "search"
 
     def _solve_proportion(self, question: str):
         """
@@ -96,8 +96,8 @@ class Agent:
                 return out
             return "Calculator: unable to parse the arithmetic expression from the question."
 
-        if tool_name == "wikipedia":
-            raw = self.tools["wikipedia"].run(question)
+        if tool_name == "search":
+            raw = self.tools["search"].run(question)
             try:
                 parsed = json.loads(raw)
             except Exception:

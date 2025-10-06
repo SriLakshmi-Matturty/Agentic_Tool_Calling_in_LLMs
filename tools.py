@@ -6,7 +6,6 @@ import wikipedia
 
 wikipedia.set_lang("en")
 
-import math
 
 class CalculatorTool:
     name = "calculator"
@@ -15,13 +14,12 @@ class CalculatorTool:
     def run(self, expr: str) -> str:
         try:
             safe_locals = {k: getattr(math, k) for k in dir(math) if not k.startswith("_")}
-            result = eval(expr, {"__builtins__": None}, safe_locals)
+            result = eval(expr, {"_builtins_": None}, safe_locals)
             if isinstance(result, float) and result.is_integer():
                 result = int(result)
             return str(result)
         except Exception as e:
             return f"Calculator Error: {e}"
-
 
 
 class SearchTool:
@@ -36,7 +34,6 @@ class SearchTool:
             r = requests.get(url, params=params, timeout=8)
             data = r.json()
 
-            # Extract main info
             if data.get("AbstractText"):
                 return {
                     "type": "summary",
@@ -44,7 +41,6 @@ class SearchTool:
                     "summary": data.get("AbstractText")
                 }
 
-            # If it's a person, often in RelatedTopics
             topics = data.get("RelatedTopics", [])
             for t in topics:
                 if isinstance(t, dict) and "Text" in t:
@@ -84,7 +80,6 @@ class SearchTool:
             if not data:
                 data = self._wikipedia_fallback(combined)
         else:
-            # Generic query
             data = self._duckduckgo_search(query)
             if not data:
                 data = self._wikipedia_fallback(query)

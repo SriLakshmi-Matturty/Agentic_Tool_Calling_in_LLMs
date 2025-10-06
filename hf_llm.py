@@ -3,7 +3,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
 class HuggingFaceLLM:
-    def _init_(self, model_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
+    def __init__(self, model_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
         print(f"Loading model: {model_name}...")
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForCausalLM.from_pretrained(

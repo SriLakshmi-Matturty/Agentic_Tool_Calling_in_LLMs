@@ -6,6 +6,7 @@ import wikipedia
 
 wikipedia.set_lang("en")
 
+import math
 
 class CalculatorTool:
     name = "calculator"
@@ -20,6 +21,7 @@ class CalculatorTool:
             return str(result)
         except Exception as e:
             return f"Calculator Error: {e}"
+
 
 
 class SearchTool:

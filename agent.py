@@ -9,7 +9,7 @@ class Agent:
     def __init__(self, use_llm_for_fallback=False, llm_model="TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
         self.tools = {
             "calculator": CalculatorTool(),
-            "wikipedia": SearchTool()
+            "search": SearchTool()
         }
         self.use_llm_for_fallback = use_llm_for_fallback
         if use_llm_for_fallback:

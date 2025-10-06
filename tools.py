@@ -1,25 +1,20 @@
-# tools.py
 import re
 import json
 import math
+import requests
 import wikipedia
 
 wikipedia.set_lang("en")
+
 
 class CalculatorTool:
     name = "calculator"
     description = "Performs safe arithmetic evaluations."
 
     def run(self, expr: str) -> str:
-        """
-        expr: a clean Python arithmetic expression like "25*(15/3)" or "2+2"
-        returns: string of result or error
-        """
         try:
-            # safe eval: allow math functions
-            safe_locals = {k: getattr(math, k) for k in dir(math) if not k.startswith("")}
-            result = eval(expr, {"_builtins_": None}, safe_locals)
-            # normalize floats that are integers
+            safe_locals = {k: getattr(math, k) for k in dir(math) if not k.startswith("_")}
+            result = eval(expr, {"__builtins__": None}, safe_locals)
             if isinstance(result, float) and result.is_integer():
                 result = int(result)
             return str(result)
@@ -27,84 +22,69 @@ class CalculatorTool:
             return f"Calculator Error: {e}"
 
 
-class WikipediaTool:
-    name = "wikipedia"
-    description = "Search Wikipedia and return structured info (tries to return person for 'Who is X of Y' queries)."
+class SearchTool:
+    name = "search"
+    description = "Searches the web using DuckDuckGo API, and falls back to Wikipedia if needed."
 
-    def _find_person_for_role(self, role: str, entity: str):
-        """
-        Heuristic search to find the incumbent (person) for queries like:
-          'Who is the president of India?'
-        Returns JSON string: {"type":"person","name": "...", "summary": "..."}
-        """
-        role = role.strip()
-        entity = entity.strip()
+    def _duckduckgo_search(self, query: str):
+        """Query DuckDuckGo Instant Answer API."""
+        try:
+            url = "https://api.duckduckgo.com/"
+            params = {"q": query, "format": "json", "no_redirect": "1", "no_html": "1"}
+            r = requests.get(url, params=params, timeout=8)
+            data = r.json()
 
-        # Try variations targeted at current/incumbent
-        variants = [
-            f"current {role} of {entity}",
-            f"incumbent {role} of {entity}",
-            f"{role} of {entity}",
-            f"List of {role} of {entity}",
-            f"{entity} {role}"
-        ]
+            # Extract main info
+            if data.get("AbstractText"):
+                return {
+                    "type": "summary",
+                    "title": data.get("Heading") or query,
+                    "summary": data.get("AbstractText")
+                }
 
-        for v in variants:
-            try:
-                hits = wikipedia.search(v, results=6)
-            except Exception:
-                hits = []
-            for title in hits:
-                # skip pages that obviously describe an office (have 'List of' or 'office' words)
-                if re.search(r'list of|office of|timeline|history', title, flags=re.I):
-                    continue
-                try:
-                    summary = wikipedia.summary(title, sentences=2)
-                except Exception:
-                    continue
-                # If the summary mentions the role and the page looks like a person, accept it
-                if re.search(fr'\b{role}\b', summary, flags=re.I) and re.match(r'^[A-Z][\w\s\-\.]+', title):
-                    # Likely we found a person page
-                    return {"type": "person", "name": title, "summary": summary}
-        return None
+            # If it's a person, often in RelatedTopics
+            topics = data.get("RelatedTopics", [])
+            for t in topics:
+                if isinstance(t, dict) and "Text" in t:
+                    text = t["Text"]
+                    if re.match(r"^[A-Z][a-z]+(\s[A-Z][a-z]+)+", text):
+                        return {
+                            "type": "person",
+                            "name": text.split(" - ")[0],
+                            "summary": text
+                        }
+            return None
+        except Exception as e:
+            return {"type": "error", "message": f"DuckDuckGo API error: {e}"}
+
+    def _wikipedia_fallback(self, query: str):
+        """Fallback search using Wikipedia if DuckDuckGo gives no good answer."""
+        try:
+            hits = wikipedia.search(query, results=5)
+            if not hits:
+                return {"type": "error", "message": f"No results for '{query}'"}
+            title = hits[0]
+            summary = wikipedia.summary(title, sentences=3)
+            return {"type": "summary", "title": title, "summary": summary}
+        except Exception as e:
+            return {"type": "error", "message": f"Wikipedia error: {e}"}
 
     def run(self, query: str) -> str:
-        """
-        Returns JSON string with either:
-        - {"type":"person","name": "...","summary":"..."}
-        - {"type":"summary","title":"...","summary":"..."}
-        - {"type":"error","message":"..."}
-        """
-        q = query.strip()
+        query = query.strip()
 
-        # detect "Who is the <role> of <entity>?" pattern
-        m = re.search(r'who\s+is\s+the\s+(.+?)\s+of\s+([^\?\.]+)', q, flags=re.I)
+        # Detect “Who is the <role> of <entity>?” type question
+        m = re.search(r'who\s+is\s+the\s+(.+?)\s+of\s+([^\?\.]+)', query, flags=re.I)
         if m:
             role = m.group(1).strip()
             entity = m.group(2).strip()
-            found = self._find_person_for_role(role, entity)
-            if found:
-                return json.dumps(found, ensure_ascii=False)
+            combined = f"current {role} of {entity}"
+            data = self._duckduckgo_search(combined)
+            if not data:
+                data = self._wikipedia_fallback(combined)
+        else:
+            # Generic query
+            data = self._duckduckgo_search(query)
+            if not data:
+                data = self._wikipedia_fallback(query)
 
-            # fallback: try explicit "current <role> of <entity>"
-            try:
-                fallback_query = f"current {role} of {entity}"
-                hits = wikipedia.search(fallback_query, results=5)
-                if hits:
-                    title = hits[0]
-                    summary = wikipedia.summary(title, sentences=2)
-                    # maybe the first hit is a person
-                    return json.dumps({"type": "person", "name": title, "summary": summary}, ensure_ascii=False)
-            except Exception:
-                pass
-
-        # generic search: return the summary of the best-matching page
-        try:
-            hits = wikipedia.search(q, results=5)
-            if not hits:
-                return json.dumps({"type": "error", "message": f"No wikipedia results for '{q}'"}, ensure_ascii=False)
-            title = hits[0]
-            summary = wikipedia.summary(title, sentences=3)
-            return json.dumps({"type": "summary", "title": title, "summary": summary}, ensure_ascii=False)
-        except Exception as e:
-            return json.dumps({"type": "error", "message": str(e)}, ensure_ascii=False)
+        return json.dumps(data, ensure_ascii=False)

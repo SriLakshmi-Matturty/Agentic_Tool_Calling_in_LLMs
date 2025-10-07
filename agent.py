@@ -6,14 +6,14 @@ from prompt_manager import PromptManager
 from tools import CalculatorTool, SearchTool
 
 class Agent:
-    def __init__(self, use_llm_for_fallback=False, llm_model="mistralai/Mistral-7B-Instruct-v0.2"):
+    def __init__(self, use_llm_for_fallback=False, llm_model="mistralai/Mistral-7B-Instruct-v0.2", token=None):
         self.tools = {
             "calculator": CalculatorTool(),
             "search": SearchTool()
         }
         self.use_llm_for_fallback = use_llm_for_fallback
         if use_llm_for_fallback:
-            self.llm = HuggingFaceAPI_LLM(model_name=llm_model)
+            self.llm = HuggingFaceAPI_LLM(model_name=llm_model, token=token)
         else:
             self.llm = None
 

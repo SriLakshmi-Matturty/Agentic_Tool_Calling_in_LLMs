@@ -1,19 +1,19 @@
 # agent.py
 import re
 import json
-from hf_llm import HuggingFaceLLM
+from hf_api_llm import HuggingFaceAPI_LLM
 from prompt_manager import PromptManager
 from tools import CalculatorTool, SearchTool
 
 class Agent:
-    def __init__(self, use_llm_for_fallback=False, llm_model="TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
+    def __init__(self, use_llm_for_fallback=False, llm_model="mistralai/Mistral-7B-Instruct-v0.2"):
         self.tools = {
             "calculator": CalculatorTool(),
             "search": SearchTool()
         }
         self.use_llm_for_fallback = use_llm_for_fallback
         if use_llm_for_fallback:
-            self.llm = HuggingFaceLLM(model_name=llm_model)
+            self.llm = HuggingFaceAPI_LLM(model_name=llm_model)
         else:
             self.llm = None
 

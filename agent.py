@@ -60,64 +60,38 @@ class Agent:
 
     def run(self, question: str) -> str:
         tool_name = self.decide_tool(question)
+    
+        
         if tool_name == "calculator":
             expr = self._extract_expression(question)
             if expr:
-                out = self.tools["calculator"].run(expr)
-                return out
-            prop = self._solve_proportion(question)
-            if prop is not None:
-                return prop
-            nums = re.findall(r'\d+\.?\d*', question)
-            if len(nums) == 2:
-                if "minute" in question or "minutes" in question:
-                    try:
-                        pay_per_hour = float(nums[0])
-                        minutes = float(nums[1])
-                        val = pay_per_hour * (minutes / 60.0)
-                        if val.is_integer():
-                            val = int(val)
-                        return str(val)
-                    except Exception:
-                        pass
-                try:
-                    val = float(nums[0]) * float(nums[1])
-                    if val.is_integer():
-                        val = int(val)
-                    return str(val)
-                except Exception:
-                    pass
+                return self.tools["calculator"].run(expr)
+    
+            
             if self.use_llm_for_fallback and self.llm:
-                prompt = f"Rewrite this question as a single Python arithmetic expression only (no text):\nQuestion: {question}\nExpression:"
-                expr_text = self.llm.generate(prompt, max_new_tokens=64)
-                expr_text = expr_text.strip().splitlines()[0]
-                expr_text = expr_text.replace('^', '')
-                out = self.tools["calculator"].run(expr_text)
-                return out
-            return "Calculator: unable to parse the arithmetic expression from the question."
-
+                from prompt_manager import PromptManager
+                prompt = PromptManager.calculator_few_shot_prompt(question)
+                reasoning = self.llm.generate(prompt, max_new_tokens=128)
+                return reasoning.strip()
+    
+            
+            return "Calculator: unable to reason or parse expression."
+    
+        
         if tool_name == "search":
+            if self.use_llm_for_fallback and self.llm:
+                from prompt_manager import PromptManager
+                prompt = PromptManager.search_few_shot_prompt(question)
+                answer = self.llm.generate(prompt, max_new_tokens=64)
+                return answer.strip()
+    
+            
             raw = self.tools["search"].run(question)
             try:
                 parsed = json.loads(raw)
+                return parsed.get("summary", "No result found.")
             except Exception:
                 return f"Search error: {raw}"
-
-            if parsed.get("type") == "person":
-                m = re.search(r'who\s+is\s+the\s+(.+?)\s+of\s+([^\?\.]+)', question, flags=re.I)
-                if m:
-                    role = m.group(1).strip()
-                    entity = m.group(2).strip()
-                    name = parsed.get("name")
-                    return f"{name} is the {role} of {entity}."
-                return f"{parsed.get('name')}: {parsed.get('summary').split('.')[0]}."
-            elif parsed.get("type") == "summary":
-                summary = parsed.get("summary", "")
-                first = summary.split('. ')[0].strip()
-                if not first.endswith('.'):
-                    first = first + '.'
-                return first
-            else:
-                return parsed.get("message", "No result found.")
+    
         return "Unhandled case."
     

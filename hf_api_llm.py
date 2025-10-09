@@ -1,5 +1,3 @@
-# hf_api_llm.py
-
 import os
 import requests
 
@@ -8,23 +6,18 @@ class HuggingFaceAPI_LLM:
         self.model_name = model_name
         self.token = token or os.getenv("HF_API_TOKEN")
         if not self.token:
-            raise ValueError("Missing Hugging Face API token. Set HF_API_TOKEN or pass token explicitly.")
-        self.base_url = "https://api-inference.huggingface.co/models/" + self.model_name
+            raise ValueError("Missing Hugging Face API token")
+        self.base_url = "https://api-inference.huggingface.co/models"
 
     def generate(self, prompt, max_new_tokens=256):
-        headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "inputs": prompt,
-            "parameters": {
-                "max_new_tokens": max_new_tokens,
-                "return_full_text": False,
-                "stop": ["####"]
-            }
-        }
-        response = requests.post(self.base_url, headers=headers, json=payload)
+        headers = {"Authorization": f"Bearer {self.token}"}
+        payload = {"inputs": prompt, "parameters": {"max_new_tokens": max_new_tokens}}
+        response = requests.post(f"{self.base_url}/{self.model_name}", headers=headers, json=payload)
         if response.status_code != 200:
             raise RuntimeError(f"Hugging Face API error {response.status_code}: {response.text}")
-        return response.json()[0]["generated_text"].strip()
+        output = response.json()
+        if isinstance(output, list) and "generated_text" in output[0]:
+            return output[0]["generated_text"]
+        if "generated_text" in output:
+            return output["generated_text"]
+        return str(output)

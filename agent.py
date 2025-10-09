@@ -1,3 +1,8 @@
+import re
+from tools import CalculatorTool, SearchTool
+from prompt_manager import PromptManager
+from hf_api_llm import HuggingFaceAPI_LLM
+
 class Agent:
     def __init__(self, llm_model=None, token=None):
         self.tools = {"calculator": CalculatorTool(), "search": SearchTool()}

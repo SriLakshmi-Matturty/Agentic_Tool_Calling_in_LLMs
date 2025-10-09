@@ -1,14 +1,12 @@
-import re
-import json
 import math
 import requests
 import wikipedia
+import re
 
 wikipedia.set_lang("en")
 
 class CalculatorTool:
     name = "calculator"
-    description = "Performs safe arithmetic evaluations."
 
     def run(self, expr: str) -> str:
         try:
@@ -20,37 +18,16 @@ class CalculatorTool:
         except Exception as e:
             return f"Calculator Error: {e}"
 
-
 class SearchTool:
     name = "search"
-    description = "Searches the web using DuckDuckGo API, fallback to Wikipedia."
-
-    def _duckduckgo_search(self, query: str):
-        try:
-            url = "https://api.duckduckgo.com/"
-            params = {"q": query, "format": "json", "no_redirect": "1", "no_html": "1"}
-            r = requests.get(url, params=params, timeout=8)
-            data = r.json()
-            if data.get("AbstractText"):
-                return {"type": "summary", "title": data.get("Heading") or query, "summary": data.get("AbstractText")}
-            return None
-        except:
-            return None
-
-    def _wikipedia_fallback(self, query: str):
-        try:
-            hits = wikipedia.search(query, results=5)
-            if not hits:
-                return {"type": "error", "message": f"No results for '{query}'"}
-            title = hits[0]
-            summary = wikipedia.summary(title, sentences=3)
-            return {"type": "summary", "title": title, "summary": summary}
-        except Exception as e:
-            return {"type": "error", "message": f"Wikipedia error: {e}"}
 
     def run(self, query: str) -> str:
-        query = query.strip()
-        data = self._duckduckgo_search(query)
-        if not data:
-            data = self._wikipedia_fallback(query)
-        return json.dumps(data, ensure_ascii=False)
+        # Use Wikipedia API as fallback search
+        try:
+            hits = wikipedia.search(query, results=1)
+            if not hits:
+                return "No result found"
+            summary = wikipedia.summary(hits[0], sentences=3)
+            return summary
+        except Exception as e:
+            return f"Search Error: {e}"

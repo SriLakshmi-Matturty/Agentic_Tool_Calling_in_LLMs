@@ -16,9 +16,11 @@ class PromptManager:
     @staticmethod
     def calculator_few_shot_prompt(question: str) -> str:
         """
-        Few-shot examples for arithmetic reasoning (GSM8K-like).
+        Few-shot examples for arithmetic reasoning (GSM8K-like), with clear instructions.
         """
         examples = """
+Solve the following problems step by step, showing calculations, and return only the final numeric answer.
+
 Q: Natalia sold clips to 48 of her friends in April, and then she sold half as many clips in May. How many clips did Natalia sell altogether in April and May?
 A: Natalia sold 48/2 = 24 clips in May.
 Natalia sold 48+24 = 72 clips altogether in April and May.
@@ -28,15 +30,9 @@ Q: Weng earns $12 an hour for babysitting. Yesterday, she just did 50 minutes of
 A: Weng earns 12/60 = 0.2 per minute.
 Working 50 minutes, she earned 0.2 * 50 = 10.
 #### 10
-
-Q: Betty is saving money for a new wallet which costs $100. Betty has only half of the money she needs. Her parents decided to give her $15 for that purpose, and her grandparents twice as much as her parents. How much more money does Betty need to buy the wallet?
-A: In the beginning, Betty has only 100/2 = 50.
-Betty's grandparents gave her 15*2 = 30.
-This means, Betty needs 100 - 50 - 30 - 15 = 5 more.
-#### 5
 """
-        # Append the actual question at the end
-        examples += f"\nQ: {question}\nA:"
+        # Append the current question explicitly
+        examples += f"\nQ: {question}\nA: Solve this question step by step, then give only the final numeric answer.\n####"
         return examples
 
     @staticmethod
@@ -54,6 +50,5 @@ A: The CEO of Tesla is Elon Musk.
 Q: Who is the Prime Minister of India?
 A: The Prime Minister of India is Narendra Modi.
 """
-        # Append the actual question
-        examples += f"\nQ: {question}\nA:"
+        examples += f"\nQ: {question}\nA: Provide a concise, factual answer in one sentence."
         return examples

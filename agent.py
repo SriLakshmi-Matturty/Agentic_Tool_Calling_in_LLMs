@@ -7,22 +7,14 @@ from tools import CalculatorTool, SearchTool
 
 class Agent:
     def __init__(self, use_llm_for_fallback=False, llm_model="mistralai/Mistral-7B-Instruct-v0.2", token=None):
-        self.tools = {
-            "calculator": CalculatorTool(),
-            "search": SearchTool()
-        }
+        self.tools = {"calculator": CalculatorTool(), "search": SearchTool()}
         self.use_llm_for_fallback = use_llm_for_fallback
-        if use_llm_for_fallback:
-            self.llm = HuggingFaceAPI_LLM(model_name=llm_model, token=token)
-        else:
-            self.llm = None
+        self.llm = HuggingFaceAPI_LLM(model_name=llm_model, token=token) if use_llm_for_fallback else None
 
     def decide_tool(self, question: str) -> str:
         q = question.lower()
-        # Simple arithmetic expression detection
         if re.search(r'\d+\s*[\+\-\\/\^]\s*\d+', q):
             return "calculator"
-        # Word problems with multiple numbers
         if any(w in q for w in ["cost", "price", "paid", "how much", "how many", "total", "worth", "dollars", "$", "rupees"]):
             nums = re.findall(r'\d+\.?\d*', q)
             if len(nums) >= 2:
@@ -30,14 +22,10 @@ class Agent:
         return "search"
 
     def _extract_expression(self, question: str):
-        """
-        If question includes an inline arithmetic expression like '17 * 24' return it.
-        """
         m = re.search(r'(\d+(?:\.\d*)?)\s*([\+\-\\/\^])\s*(\d+(?:\.\d*)?)', question)
         if m:
             a, op, b = m.group(1), m.group(2), m.group(3)
-            expr = f"{a}{op}{b}"
-            expr = expr.replace('^', '**')  # for exponentiation
+            expr = f"{a}{op}{b}".replace("^", "**")
             return expr
         return None
 
@@ -45,25 +33,22 @@ class Agent:
         tool_name = self.decide_tool(question)
 
         if tool_name == "calculator":
-            if self.use_llm_for_fallback and self.llm:
-                prompt = PromptManager.calculator_few_shot_prompt(question)
-                reasoning = self.llm.generate(prompt, max_new_tokens=512)
-                # Optional: extract only the numeric answer after '####'
-                m = re.search(r'####\s*([0-9\.]+)', reasoning)
-                return m.group(1) if m else reasoning.strip()
-
-            # fallback to simple inline arithmetic
             expr = self._extract_expression(question)
             if expr:
                 return self.tools["calculator"].run(expr)
 
-            return "Calculator: unable to reason or parse expression."
+            if self.use_llm_for_fallback and self.llm:
+                prompt = PromptManager.calculator_few_shot_prompt(question)
+                reasoning = self.llm.generate(prompt, max_new_tokens=512)
+                m = re.search(r'####\s*([0-9\.]+)', reasoning)
+                return m.group(1) if m else reasoning.strip()
+
+            return "Calculator: unable to parse expression."
 
         if tool_name == "search":
             if self.use_llm_for_fallback and self.llm:
                 prompt = PromptManager.search_few_shot_prompt(question)
-                answer = self.llm.generate(prompt, max_new_tokens=256)
-                return answer.strip()
+                return self.llm.generate(prompt, max_new_tokens=256).strip()
 
             raw = self.tools["search"].run(question)
             try:
@@ -72,4 +57,3 @@ class Agent:
             except Exception:
                 return f"Search error: {raw}"
 
-        return "Unhandled case."

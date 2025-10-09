@@ -19,8 +19,10 @@ class Agent:
 
     def decide_tool(self, question: str) -> str:
         q = question.lower()
-        if re.search(r'\d+\s*[\+\-\\/\^]\s\d+', q):
+        # Simple arithmetic expression detection
+        if re.search(r'\d+\s*[\+\-\\/\^]\s*\d+', q):
             return "calculator"
+        # Word problems with multiple numbers
         if any(w in q for w in ["cost", "price", "paid", "how much", "how many", "total", "worth", "dollars", "$", "rupees"]):
             nums = re.findall(r'\d+\.?\d*', q)
             if len(nums) >= 2:
@@ -31,7 +33,7 @@ class Agent:
         """
         If question includes an inline arithmetic expression like '17 * 24' return it.
         """
-        m = re.search(r'(\d+(?:\.\d*)?)\s*([\+\-\\/\^])\s(\d+(?:\.\d*)?)', question)
+        m = re.search(r'(\d+(?:\.\d*)?)\s*([\+\-\\/\^])\s*(\d+(?:\.\d*)?)', question)
         if m:
             a, op, b = m.group(1), m.group(2), m.group(3)
             expr = f"{a}{op}{b}"
@@ -43,13 +45,14 @@ class Agent:
         tool_name = self.decide_tool(question)
 
         if tool_name == "calculator":
-            # Use LLM few-shot prompt for multi-step problems
             if self.use_llm_for_fallback and self.llm:
                 prompt = PromptManager.calculator_few_shot_prompt(question)
-                reasoning = self.llm.generate(prompt, max_new_tokens=256)
-                return reasoning.strip()
+                reasoning = self.llm.generate(prompt, max_new_tokens=512)
+                # Optional: extract only the numeric answer after '####'
+                m = re.search(r'####\s*([0-9\.]+)', reasoning)
+                return m.group(1) if m else reasoning.strip()
 
-            # Fallback to simple inline expression
+            # fallback to simple inline arithmetic
             expr = self._extract_expression(question)
             if expr:
                 return self.tools["calculator"].run(expr)
@@ -57,13 +60,11 @@ class Agent:
             return "Calculator: unable to reason or parse expression."
 
         if tool_name == "search":
-            # Use LLM few-shot prompt for search
             if self.use_llm_for_fallback and self.llm:
                 prompt = PromptManager.search_few_shot_prompt(question)
-                answer = self.llm.generate(prompt, max_new_tokens=128)
+                answer = self.llm.generate(prompt, max_new_tokens=256)
                 return answer.strip()
 
-            # Fallback to tools
             raw = self.tools["search"].run(question)
             try:
                 parsed = json.loads(raw)

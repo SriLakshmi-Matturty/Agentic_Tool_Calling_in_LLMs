@@ -7,7 +7,7 @@ class HuggingFaceAPI_LLM:
         self.token = token or os.getenv("HF_API_TOKEN")
         if not self.token:
             raise ValueError("Missing Hugging Face API token")
-        self.base_url = "https://router.huggingface.co/v1"
+        self.base_url = "https://router.huggingface.co/v1/chat/completions"
 
     def generate(self, prompt, max_new_tokens=256):
         headers = {"Authorization": f"Bearer {self.token}"}

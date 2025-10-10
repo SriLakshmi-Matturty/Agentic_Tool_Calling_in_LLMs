@@ -9,48 +9,43 @@ class Agent:
         self.llm = LocalLLM(model_name=llm_model)
 
     def decide_tool_and_expr(self, question: str):
-        # 1️⃣ Check if question is simple math
-        simple_math_pattern = r"^[\d\s\.\+\-\*/\(\)]+$"
-        if re.fullmatch(simple_math_pattern, question.replace(" ", "")):
-            print(f"[DEBUG] Detected simple numeric expression: {question}")
-            return "calculator", question
-
-        # 2️⃣ Otherwise, ask LLM to classify & extract expression
-        prompt = f"""
+    simple_math_pattern = r"^[\d\s\.\+\-\*/\(\)]+$"
+    if re.fullmatch(simple_math_pattern, question.replace(" ", "")):
+        print(f"[DEBUG] Detected simple numeric expression: {question}")
+        return "calculator", question
+    prompt = f"""
 Classify the question as 'math' or 'factual'.
-If it is math, also provide a valid Python expression for the calculator.
+If it is math, provide a single valid Python expression for the calculator.
 Examples:
 Q: Priyansh bought 3 chocolates for $15. Cost for 25?
-A: math, 15/3*25
+A: 15/3*25
 
 Q: Who is the PM of India?
 A: factual
 
 Q: What is 235 * 47?
-A: math, 235*47
+A: 235*47
 
 Q: {question}
 A:
 """
-        response = self.llm.generate(prompt, max_new_tokens=128).strip()
-        print(f"[DEBUG] LLM response: {response}")
+    response = self.llm.generate(prompt, max_new_tokens=128).strip()
+    print(f"[DEBUG] LLM response: {response}")
 
-        # Attempt to parse
-        if "math" in response.lower():
-            # extract expression after comma
-            if "," in response:
-                expr = response.split(",", 1)[-1].strip()
+    if "math" in response.lower() or re.search(r"[\d\+\-\*/\(\)]", response):
+        # Extract first line with numbers/operators
+        lines = response.splitlines()
+        for line in lines[::-1]:  
+            expr_match = re.search(r"[\d\.\+\-\*/\(\)]+", line)
+            if expr_match:
+                expr = expr_match.group()
                 print(f"[DEBUG] Extracted expression: {expr}")
                 return "calculator", expr
-            else:
-                # fallback: try to extract digits and operators
-                expr = "".join(re.findall(r"[\d\.\+\-\*/\(\)]+", response))
-                print(f"[DEBUG] Fallback extracted expression: {expr}")
-                return "calculator", expr
 
-        # Otherwise, treat as factual
-        print("[DEBUG] Using SearchTool for factual question.")
-        return "search", None
+    
+    print("[DEBUG] Using SearchTool for factual question.")
+    return "search", None
+
 
     def run(self, question: str) -> str:
         tool_name, expr = self.decide_tool_and_expr(question)

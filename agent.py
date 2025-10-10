@@ -54,7 +54,7 @@ class Agent:
             # Handle accidental empty expressions
             if not expr:
                 expr = "0"
-    
+            print(expr)
             return "calculator", expr
     
         # Default fallback

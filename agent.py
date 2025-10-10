@@ -1,7 +1,7 @@
 import re
 from tools import CalculatorTool, SearchTool
 from prompt_manager import PromptManager
-from hf_local_llm import LocalLLM
+from hf_llm import LocalLLM
 
 class Agent:
     def __init__(self, llm_model=None):

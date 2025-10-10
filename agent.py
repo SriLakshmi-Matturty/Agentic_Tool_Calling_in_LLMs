@@ -29,7 +29,6 @@ A:"""
         response = self.llm.generate(prompt, max_new_tokens=64).strip()
         print(f"[DEBUG] LLM response: {response}")
 
-n
         if "math" in response.lower():
             expr_match = re.search(r"[\d\.\+\-\*/\(\)\s]+", response)
             if expr_match:

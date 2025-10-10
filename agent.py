@@ -19,7 +19,7 @@ class Agent:
             return "calculator", question
 
         prompt = f"""
-Classify the question as 'math' or 'factual'.
+Classify the question as 'math' or 'factual'. If it is factual then do not generate anything.
 If it is math, only provide a valid Python expression for the calculator.
 Do NOT generate extra questions or examples.
 

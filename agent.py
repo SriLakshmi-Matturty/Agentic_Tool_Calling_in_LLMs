@@ -20,8 +20,9 @@ class Agent:
 
         prompt = f"""
 Classify the question as 'math' or 'factual'. If it is factual then do not provide anything.
-If it is math, only provide a valid Python expression for the calculator, do not calculate answer just give the expression only.
-Do NOT generate extra questions or examples.
+If it is math, only provide a valid Python expression for the calculator, do not calculate answer just give the regular expression only
+(Example: If the question is "What is 2*3?" then provide the expression as 2*3).
+Do NOT generate extra questions or examples. Only give expression for the math question do not add extra questions to it.
 
 Q: {question}
 A:"""

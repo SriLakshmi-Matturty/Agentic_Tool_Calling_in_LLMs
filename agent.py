@@ -19,8 +19,6 @@ class Agent:
     If it is math, ONLY return a single valid Python expression.
     Do NOT include explanations, comments, or other examples.
     
-    Q: {question}
-    A:
     """
         response = self.llm.generate(prompt, max_new_tokens=64).strip()
         print(f"[DEBUG] LLM response: {response}")

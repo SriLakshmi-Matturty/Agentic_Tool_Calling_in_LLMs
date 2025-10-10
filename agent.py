@@ -22,34 +22,41 @@ class Agent:
             print(f"[DEBUG] Detected simple numeric expression: {question}")
             return "calculator", question
     
-        # Stronger prompt with JSON constraint
+        # Stronger reasoning-aware prompt
         prompt = f"""
-    You are a classifier that decides whether a question is "math" or "factual".
+    You are a precise reasoning assistant that classifies a question as "math" or "factual".
     
-    - If the question requires numeric or arithmetic reasoning, classify it as "math"
-      and provide a valid Python expression string that can be evaluated with eval().
-    - If the question is factual or conceptual, classify it as "factual" and return None.
+    If it is math:
+    1. Think step-by-step (internally) about how the quantities relate.
+    2. Produce a valid Python expression that represents the correct order of operations.
+    3. Use parentheses to make the intended logic explicit (e.g., ((16 - 3) - 4) * 2).
+    4. Do NOT compute the result, just generate the expression.
+    5. Your final answer MUST be in valid JSON format, nothing else.
     
-    ⚠️ Output MUST be in strict JSON format as below:
-    {{
+    Examples:
+    Q: What is 2 + 3?
+    A: {{
       "type": "math",
       "expression": "2 + 3"
     }}
     
-    or
+    Q: Janet’s ducks lay 16 eggs per day. She eats three and bakes muffins with four. She sells the rest at $2 per egg. How much does she make?
+    A: {{
+      "type": "math",
+      "expression": "((16 - 3) - 4) * 2"
+    }}
     
-    {{
+    Q: Who is the president of India?
+    A: {{
       "type": "factual",
       "expression": null
     }}
-    
-    Do NOT include explanations, examples, or any text outside JSON.
     
     Q: {question}
     A:
     """
     
-        response = self.llm.generate(prompt, max_new_tokens=128).strip()
+        response = self.llm.generate(prompt, max_new_tokens=256).strip()
         print(f"[DEBUG] Raw LLM response: {response}")
     
         import json
@@ -64,12 +71,16 @@ class Agent:
     
             if q_type == "math" and expr:
                 expr = expr.strip()
-                if re.match(r"^[\d\s\.\+\-\*/\(\)]+$", expr):
-                    print(f"[DEBUG] Extracted expression: {expr}")
-                    return "calculator", expr
-                else:
-                    print(f"[DEBUG] Invalid math expression format: {expr}")
-                    return "calculator", None
+    
+                # --- Auto-fix heuristic: if multiple '-' and '*' exist, add grouping ---
+                if re.search(r"-.*-", expr) and "*" in expr and "(" not in expr:
+                    parts = expr.split("*")
+                    left = parts[0].strip()
+                    right = "*".join(parts[1:]).strip()
+                    expr = f"({left}) * {right}"
+    
+                print(f"[DEBUG] Extracted expression: {expr}")
+                return "calculator", expr
     
             elif q_type == "factual":
                 print("[DEBUG] Classified as factual.")
@@ -81,6 +92,7 @@ class Agent:
             return "search", None
     
         return "search", None
+
 
     def run(self, question: str) -> str:
         tool_name, expr = self.decide_tool_and_expr(question)

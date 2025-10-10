@@ -18,16 +18,30 @@ class CalculatorTool:
         except Exception as e:
             return f"Calculator Error: {e}"
 
+
 class SearchTool:
     name = "search"
 
+    def __init__(self, serpapi_key):
+        self.api_key = serpapi_key
+
     def run(self, query: str) -> str:
-        # Use Wikipedia API as fallback search
         try:
-            hits = wikipedia.search(query, results=1)
-            if not hits:
+            # Call SerpAPI
+            url = "https://serpapi.com/search"
+            params = {
+                "q": query,
+                "api_key": self.api_key,
+                "num": 3,  # top 3 results
+            }
+            r = requests.get(url, params=params).json()
+            snippets = []
+            for res in r.get("organic_results", []):
+                snippet = res.get("snippet")
+                if snippet:
+                    snippets.append(snippet)
+            if not snippets:
                 return "No result found"
-            summary = wikipedia.summary(hits[0], sentences=3)
-            return summary
+            return "\n".join(snippets)
         except Exception as e:
             return f"Search Error: {e}"

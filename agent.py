@@ -5,15 +5,19 @@ from hf_llm import LocalLLM
 
 class Agent:
     def __init__(self, llm_model=None, serpapi_key=None):
-        self.tools = {"calculator": CalculatorTool(), "search": SearchTool(serpapi_key)}
+        self.tools = {
+            "calculator": CalculatorTool(),
+            "search": SearchTool(serpapi_key)
+        }
         self.llm = LocalLLM(model_name=llm_model)
 
     def decide_tool_and_expr(self, question: str):
+       
         simple_math_pattern = r"^[\d\s\.\+\-\*/\(\)]+$"
         if re.fullmatch(simple_math_pattern, question.replace(" ", "")):
             print(f"[DEBUG] Detected simple numeric expression: {question}")
             return "calculator", question
-    
+
         prompt = f"""
 Classify the question as 'math' or 'factual'.
 If it is math, only provide a valid Python expression for the calculator.
@@ -24,16 +28,17 @@ A:"""
 
         response = self.llm.generate(prompt, max_new_tokens=64).strip()
         print(f"[DEBUG] LLM response: {response}")
-    
-        expr_match = re.search(r"[\d\.\+\-\*/\(\)]+", response)
-        if expr_match:
-            expr = expr_match.group()
-            print(f"[DEBUG] Extracted expression: {expr}")
-            return "calculator", expr
-    
+
+n
+        if "math" in response.lower():
+            expr_match = re.search(r"[\d\.\+\-\*/\(\)\s]+", response)
+            if expr_match:
+                expr = expr_match.group().strip()
+                print(f"[DEBUG] Extracted expression: {expr}")
+                return "calculator", expr
+
         print("[DEBUG] Using SearchTool for factual question.")
         return "search", None
-
 
     def run(self, question: str) -> str:
         tool_name, expr = self.decide_tool_and_expr(question)

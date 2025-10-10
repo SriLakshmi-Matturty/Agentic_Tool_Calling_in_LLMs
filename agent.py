@@ -1,12 +1,12 @@
 import re
 from tools import CalculatorTool, SearchTool
 from prompt_manager import PromptManager
-from hf_api_llm import HuggingFaceAPI_LLM
+from hf_local_llm import LocalLLM
 
 class Agent:
     def __init__(self, llm_model=None, token=None):
         self.tools = {"calculator": CalculatorTool(), "search": SearchTool()}
-        self.llm = HuggingFaceAPI_LLM(llm_model, token)
+        self.llm = LocalLLM(model_name=llm_model)
 
     def decide_tool_and_expr(self, question: str):
         """

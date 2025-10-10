@@ -62,18 +62,18 @@ class Agent:
 
 
     def run(self, question: str) -> str:
-    tool_name, expr = self.decide_tool_and_expr(question)
-
-    if tool_name == "calculator":
-        if expr:
-            print(f"[DEBUG] Expression passed to calculator: {expr}")
-            return self.tools["calculator"].run(expr)
-        print("[DEBUG] No valid expression extracted for calculator.")
-        return "Calculator: Unable to parse expression"
-
-    if tool_name == "search":
-        print("[DEBUG] Using SearchTool for factual question.")
-        return self.tools["search"].run(question)
-
-    print("[DEBUG] Unable to classify question type.")
-    return "Unable to handle question"
+        tool_name, expr = self.decide_tool_and_expr(question)
+    
+        if tool_name == "calculator":
+            if expr:
+                print(f"[DEBUG] Expression passed to calculator: {expr}")
+                return self.tools["calculator"].run(expr)
+            print("[DEBUG] No valid expression extracted for calculator.")
+            return "Calculator: Unable to parse expression"
+    
+        if tool_name == "search":
+            print("[DEBUG] Using SearchTool for factual question.")
+            return self.tools["search"].run(question)
+    
+        print("[DEBUG] Unable to classify question type.")
+        return "Unable to handle question"

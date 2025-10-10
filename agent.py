@@ -14,13 +14,13 @@ class Agent:
             print(f"[DEBUG] Detected simple numeric expression: {question}")
             return "calculator", question
     
-            prompt = f"""
-    Classify the question as 'math' or 'factual'.
-    If it is math, only provide a valid Python expression for the calculator.
-    Do NOT generate extra questions or examples.
-    
-    Q: {question}
-    A:"""
+        prompt = f"""
+Classify the question as 'math' or 'factual'.
+If it is math, only provide a valid Python expression for the calculator.
+Do NOT generate extra questions or examples.
+
+Q: {question}
+A:"""
 
         response = self.llm.generate(prompt, max_new_tokens=64).strip()
         print(f"[DEBUG] LLM response: {response}")

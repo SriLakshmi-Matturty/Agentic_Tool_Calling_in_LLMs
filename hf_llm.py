@@ -22,12 +22,12 @@ class LocalLLM:
         )
 
     def generate(self, prompt: str, max_new_tokens: int = 256) -> str:
-    output = self.pipe(
-        prompt,
-        max_new_tokens=max_new_tokens,
-        do_sample=False,   
-        temperature=0.0,   
-        top_p=1.0,
-    )
-    return output[0]["generated_text"].replace(prompt, "").strip()
+        output = self.pipe(
+            prompt,
+            max_new_tokens=max_new_tokens,
+            do_sample=False,   
+            temperature=0.0,   
+            top_p=1.0,
+        )
+        return output[0]["generated_text"].replace(prompt, "").strip()
 

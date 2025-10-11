@@ -11,7 +11,7 @@ class CalculatorTool:
     def run(self, expr: str) -> str:
         try:
             safe_locals = {k: getattr(math, k) for k in dir(math) if not k.startswith("_")}
-            result = eval(expr, {"__builtins__": None}, safe_locals)
+            result = eval(expr, {"_builtins_": None}, safe_locals)
             if isinstance(result, float) and result.is_integer():
                 result = int(result)
             return str(result)
@@ -22,7 +22,7 @@ class CalculatorTool:
 class SearchTool:
     name = "search"
 
-    def __init__(self, serpapi_key):
+    def _init_(self, serpapi_key):
         self.api_key = serpapi_key
 
     def run(self, query: str) -> str:

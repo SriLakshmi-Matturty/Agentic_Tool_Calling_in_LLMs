@@ -14,8 +14,8 @@ class Agent:
 
     def decide_tool_and_expr(self, question: str):
         """
-        Decide which tool to call based on question.
-        Returns: (tool_name, expression/query)
+        Decide which tool to call based on the question.
+        Returns: (tool_name, expression)
         """
     
         simple_math_pattern = r"^[\d\s\.\+\-\*/\(\)]+$"
@@ -24,12 +24,29 @@ class Agent:
             return "calculator", question
     
         prompt = f"""
-    Classify the question as 'math' or 'factual'. Do not add extra questions just return json format only.
+    Classify the question as 'math' or 'factual'.
     Respond ONLY in JSON format like:
     
-    {{"type": "math", "expression": "2+3"}}
+    {{"type": "math", "expression": "(2+3)*5"}}
+    (Examples:
+      1) Natalia sold clips to 48 of her friends in April, and then she sold half as many clips in May. How many clips did Natalia sell altogether in April and May? then provide
+        {{"type": "math", "expression": "48+(48/2)"}}
+      2) Weng earns $12 an hour for babysitting. Yesterday, she just did 50 minutes of babysitting. How much did she earn? then provide
+         {{"type": "math", "expression": "(12/60)*50"}}
+      3) Julie is reading a 120-page book. Yesterday, she was able to read 12 pages and today, she read twice as many pages as yesterday. 
+         If she wants to read half of the remaining pages tomorrow, how many pages should she read? then provide
+         {{"type": "math", "expression": "120-(12+(12*2))"}}
+    )
     or
     {{"type": "factual", "expression": null}}
+    (Examples:
+      1) Who is President of America? then provide
+         {{"type": "factual", "expression": null}}
+      2) What is the currency of India? then provide
+         {{"type": "factual", "expression": null}}
+      3)  What is the synonym of happy? then provide
+         {{"type": "factual", "expression": null}}
+    )
     
     Q: {question}
     A:
@@ -40,23 +57,27 @@ class Agent:
         try:
             parsed = json.loads(response)
     
-            # Case 1: Math
             if parsed["type"] == "math" and parsed["expression"]:
-                expr = parsed["expression"]
-                if re.fullmatch(r"[\d\s\.\+\-\*/\(\)a-zA-Z]+", expr):
+                expr = parsed["expression"].strip()
+                if re.fullmatch(r"^[\d\s\.\+\-\*/\(\)]+$", expr):
                     print(f"[DEBUG] Using CalculatorTool for expression: {expr}")
                     return "calculator", expr
+                else:
+                    print(f"[DEBUG] Expression invalid or unsafe: {expr}")
+                    return "search", question  
     
-            # Case 2: Factual (expression is null)
             elif parsed["type"] == "factual":
                 print("[DEBUG] Using SearchTool for factual question.")
                 return "search", question
     
+            else:
+                print("[DEBUG] Unrecognized type, defaulting to SearchTool.")
+                return "search", question
+    
         except json.JSONDecodeError:
             print("[DEBUG] Invalid JSON from LLM, defaulting to SearchTool")
+            return "search", question
     
-        # Fallback
-        return "search", question
 
     def run(self, question: str):
         tool_name, expr_or_query = self.decide_tool_and_expr(question)

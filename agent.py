@@ -38,7 +38,7 @@ If it is factual then provide "factual, None".
 4) What is an AI? then provide "factual, None"
 5) Who is the synonym of happy? then provide "factual, None"
 ).
-Do NOT generate extra questions or examples. Only give expression for the math question do not add extra questions to it.
+Do NOT generate extra questions or examples. If it factual only give "factual, None", don't give answer. Do not add extra questions to the response.
 
 Q: {question}
 A:"""

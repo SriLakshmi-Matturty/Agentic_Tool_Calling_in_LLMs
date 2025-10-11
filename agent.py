@@ -25,7 +25,8 @@ class Agent:
     
         prompt = f"""
     Classify the question as 'math' or 'factual'.
-    Understand the question properly. If it is math, then think step by step and try to give correct expression. Do not give explanation with the JSON format. You should only give JSON format
+    Understand the question properly. If it is math, then think step by step and try to give correct expression. Do not give explanation with the JSON format. You should only give JSON format.
+    Do not add anything to the JSON format, the JSON format should only contain the type and expression as given below.
     Respond ONLY in JSON format like:
     
     {{"type": "math", "expression": "(2+3)*5"}}

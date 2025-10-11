@@ -4,12 +4,12 @@ from prompt_manager import PromptManager
 from hf_llm import LocalLLM
 
 class Agent:
-    def __init__(self, llm_model=None, serpapi_key=None):
+    def __init__(self, llm_model=None, serpapi_key=None, hf_token=None):
         self.tools = {
             "calculator": CalculatorTool(),
             "search": SearchTool(serpapi_key)
         }
-        self.llm = LocalLLM(model_name=llm_model)
+        self.llm = LocalLLM(model_name=llm_model, hf_token=hf_token)
 
     def decide_tool_and_expr(self, question: str):
        

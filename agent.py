@@ -47,10 +47,12 @@ A:
                 if re.fullmatch(r"[\d\s\.\+\-\*/\(\)]+", expr):
                     print(f"[DEBUG] Using CalculatorTool for expression: {expr}")
                     return "calculator", expr
-            return "search", None
+            # For factual questions, pass the question itself to SearchTool
+            print(f"[DEBUG] Using SearchTool for factual question: {question}")
+            return "search", question
         except json.JSONDecodeError:
             print("[DEBUG] Invalid JSON from LLM, defaulting to SearchTool")
-            return "search", None
+            return "search", question
 
     def run(self, question: str):
         tool_name, expr = self.decide_tool_and_expr(question)

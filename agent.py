@@ -15,42 +15,48 @@ class Agent:
     def decide_tool_and_expr(self, question: str):
         """
         Decide which tool to call based on question.
-        Returns: (tool_name, expression or query)
+        Returns: (tool_name, expression/query)
         """
-
-        # Quick numeric check
+    
         simple_math_pattern = r"^[\d\s\.\+\-\*/\(\)]+$"
         if re.fullmatch(simple_math_pattern, question.replace(" ", "")):
             print(f"[DEBUG] Detected simple numeric expression: {question}")
             return "calculator", question
-
-        # Prompt LLM with JSON output requirement
+    
         prompt = f"""
-Classify the question as 'math' or 'factual'.
-Respond ONLY in JSON format like:
-
-{{"type": "math", "expression": "2+3"}}
-or
-{{"type": "factual", "expression": null}}
-
-"""
+    Classify the question as 'math' or 'factual'. Do not add extra questions just return json format only.
+    Respond ONLY in JSON format like:
+    
+    {{"type": "math", "expression": "2+3"}}
+    or
+    {{"type": "factual", "expression": null}}
+    
+    Q: {question}
+    A:
+    """
         response = self.llm.generate(prompt, max_new_tokens=64).strip()
         print(f"[DEBUG] LLM response: {response}")
-
+    
         try:
             parsed = json.loads(response)
+    
+            # Case 1: Math
             if parsed["type"] == "math" and parsed["expression"]:
                 expr = parsed["expression"]
-                # Allow pi in expressions
-                if re.fullmatch(r"[\d\s\.\+\-\*/\(\)piPI]+", expr):
+                if re.fullmatch(r"[\d\s\.\+\-\*/\(\)a-zA-Z]+", expr):
                     print(f"[DEBUG] Using CalculatorTool for expression: {expr}")
                     return "calculator", expr
-            # For factual questions, pass the question itself to SearchTool
-            print(f"[DEBUG] Using SearchTool for factual question: {question}")
-            return "search", question
+    
+            # Case 2: Factual (expression is null)
+            elif parsed["type"] == "factual":
+                print("[DEBUG] Using SearchTool for factual question.")
+                return "search", question
+    
         except json.JSONDecodeError:
             print("[DEBUG] Invalid JSON from LLM, defaulting to SearchTool")
-            return "search", question
+    
+        # Fallback
+        return "search", question
 
     def run(self, question: str):
         tool_name, expr_or_query = self.decide_tool_and_expr(question)

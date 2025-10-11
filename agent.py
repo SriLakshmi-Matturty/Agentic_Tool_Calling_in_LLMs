@@ -1,8 +1,8 @@
 import re
 from tools import CalculatorTool, SearchTool
-from prompt_manager import PromptManager
 from hf_llm import LocalLLM
 import json
+import math
 
 class Agent:
     def __init__(self, llm_model=None, serpapi_key=None):
@@ -15,7 +15,7 @@ class Agent:
     def decide_tool_and_expr(self, question: str):
         """
         Decide which tool to call based on question.
-        Returns: (tool_name, expression/None)
+        Returns: (tool_name, expression or query)
         """
 
         # Quick numeric check
@@ -39,12 +39,12 @@ A:
         response = self.llm.generate(prompt, max_new_tokens=64).strip()
         print(f"[DEBUG] LLM response: {response}")
 
-        # Parse JSON output safely
         try:
             parsed = json.loads(response)
             if parsed["type"] == "math" and parsed["expression"]:
                 expr = parsed["expression"]
-                if re.fullmatch(r"[\d\s\.\+\-\*/\(\)]+", expr):
+                # Allow pi in expressions
+                if re.fullmatch(r"[\d\s\.\+\-\*/\(\)piPI]+", expr):
                     print(f"[DEBUG] Using CalculatorTool for expression: {expr}")
                     return "calculator", expr
             # For factual questions, pass the question itself to SearchTool
@@ -55,7 +55,10 @@ A:
             return "search", question
 
     def run(self, question: str):
-        tool_name, expr = self.decide_tool_and_expr(question)
+        tool_name, expr_or_query = self.decide_tool_and_expr(question)
         tool = self.tools[tool_name]
-        result = tool.execute(expr)
+        if tool_name == "calculator":
+            # Support pi in expressions
+            expr_or_query = expr_or_query.replace("pi", str(math.pi))
+        result = tool.execute(expr_or_query)
         return result

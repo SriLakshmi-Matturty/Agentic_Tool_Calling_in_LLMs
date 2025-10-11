@@ -33,8 +33,6 @@ Respond ONLY in JSON format like:
 or
 {{"type": "factual", "expression": null}}
 
-Q: {question}
-A:
 """
         response = self.llm.generate(prompt, max_new_tokens=64).strip()
         print(f"[DEBUG] LLM response: {response}")

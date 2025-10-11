@@ -11,7 +11,7 @@ class LocalLLM:
         self.tokenizer = AutoTokenizer.from_pretrained(model_name, token=hf_token)
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            token=hf_token
+            token=hf_token,
             torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
             device_map="auto"
         )

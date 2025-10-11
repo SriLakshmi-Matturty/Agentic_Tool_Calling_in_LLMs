@@ -20,17 +20,17 @@ class Agent:
 
         prompt = f"""
 Classify the question as 'math' or 'factual'.
-If it is math, provide "math" and valid Python expression for the calculator, do not calculate answer just give the regular expression only
+If it is math, then your response should be of the form "math, ecpression". Below are the examples for your reference.
 (Example: If the question is 
-1) What is 2*3? then provide "math, 2*3"
-2) Natalia sold clips to 48 of her friends in April, and then she sold half as many clips in May. How many clips did Natalia sell altogether in April and May? then provide "math, 48+(48/2)"
+1) What is 2*3? then provide "math, 2*3".
+2) Natalia sold clips to 48 of her friends in April, and then she sold half as many clips in May. How many clips did Natalia sell altogether in April and May? then provide "math, 48+(48/2)".
 3) Weng earns $12 an hour for babysitting. Yesterday, she just did 50 minutes of babysitting. How much did she earn?
-   then provide "math, (12/60)*50"
+   then provide "math, (12/60)*50".
 4) Julie is reading a 120-page book. Yesterday, she was able to read 12 pages and today, she read twice as many pages as yesterday. If she wants to read half of the remaining pages tomorrow,
-   how many pages should she read? then provide "math, 120-(12+(12*2))"
-5) James writes a 3-page letter to 2 different friends twice a week.  How many pages does he write a year? then provide "math, ((3*2)*2)*52"
+   how many pages should she read? then provide "math, 120-(12+(12*2))".
+5) James writes a 3-page letter to 2 different friends twice a week.  How many pages does he write a year? then provide "math, ((3*2)*2)*52".
 ).
-If it is factual then provide "factual, None".
+If it is factual, then your response should be of the form "factual, None". Below are the examples for your reference.
 (Example: If the question is
 1) Who is President of America? then provide "factual, None"
 2) What is the captial of Australia? then provide "factual, None"

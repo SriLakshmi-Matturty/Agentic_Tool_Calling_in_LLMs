@@ -38,6 +38,15 @@ class Agent:
                 return None
         return None
 
+    def clean_expression(self, expr: str) -> str:
+        """
+        Cleans the expression by removing trailing '=' and extra spaces.
+        """
+        expr = expr.strip()
+        if expr.endswith('='):
+            expr = expr[:-1].strip()
+        return expr
+
     def decide_tool_and_expr(self, question: str):
         """
         Decide which tool to call based on the question.
@@ -65,17 +74,18 @@ You are a math expression extractor.
 
 Instructions:
 1. Respond ONLY with a JSON object containing a symbolic expression.
-2. NEVER compute the answer.
-3. NEVER include explanations, reasoning, or code.
-4. Format exactly as: {{"type": "math", "expression": "<expression_here>"}}
+2. The JSON must have ONLY one key: "expression".
+   Example: {{"expression": "2+3"}}
+3. DO NOT compute the answer.
+4. DO NOT include explanations, reasoning, code, "result", or "=".
 5. Use only +, -, *, /, parentheses, pi, numbers, and variables.
 
 Examples:
 Q: What is 2+3?
-A: {{"type": "math", "expression": "2+3"}}
+A: {{"expression": "2+3"}}
 
-Q: Weng earns $12/hour. She worked 50 minutes. How much did she earn?
-A: {{"type": "math", "expression": "(12/60)*50"}}
+Q: Julie read 12 pages yesterday, today twice as many, half remaining tomorrow?
+A: {{"expression": "120-(12+12*2)/2"}}
 
 Question: {question}
 """
@@ -84,16 +94,16 @@ Question: {question}
 
             # Try extracting JSON first
             parsed = self.extract_json_from_text(response)
-            if parsed:
-                expr = parsed.get("expression", "").strip()
-                if expr:
-                    print(f"[DEBUG] Using CalculatorTool from JSON expression: {expr}")
-                    return "calculator", expr
+            if parsed and "expression" in parsed:
+                expr = self.clean_expression(parsed["expression"])
+                print(f"[DEBUG] Using CalculatorTool from JSON expression: {expr}")
+                return "calculator", expr
             else:
                 # JSON not found, fallback to regex
                 print("[DEBUG] Could not extract JSON, trying regex fallback")
                 expr = self.extract_expression_from_text(response)
                 if expr:
+                    expr = self.clean_expression(expr)
                     print(f"[DEBUG] Using CalculatorTool from regex extracted expression: {expr}")
                     return "calculator", expr
 

@@ -24,43 +24,49 @@ class Agent:
         # Step 0: detect simple numeric expressions
         simple_math_pattern = r"^[\d\s\.\+\-\*/\(\)]+$"
         if re.fullmatch(simple_math_pattern, question.replace(" ", "")):
+            print(f"[DEBUG] Simple numeric expression detected: {question}")
             return "calculator", question
 
         # Step 1: classify question using classifier LLM
         classifier_prompt = f"""
-        Classify the following question as either 'math' or 'factual'. Respond only with 'math' or 'factual'.
+Classify the following question as either 'math' or 'factual'. Respond ONLY with 'math' or 'factual'.
 
-        Question: {question}
-        """
+Question: {question}
+"""
         classification = self.classifier_llm.generate(classifier_prompt, max_new_tokens=16).strip().lower()
+        print(f"[DEBUG] Classifier output: {classification}")
 
         # Step 2: if math, send to math LLM to extract expression
         if "math" in classification:
             math_prompt = f"""
-            Extract the correct mathematical expression from the question below.
-            Respond ONLY in JSON format:
-            {{"type": "math", "expression": "<expression_here>"}}
-            Do not add explanations.
+Extract the correct mathematical expression from the question below.
+Respond ONLY in JSON format:
+{{"type": "math", "expression": "<expression_here>"}}
+Do NOT add explanations.
 
-            Question: {question}
-            """
-            response = self.math_llm.generate(math_prompt, max_new_tokens=64).strip()
+Question: {question}
+"""
+            response = self.math_llm.generate(math_prompt, max_new_tokens=128).strip()
+            print(f"[DEBUG] Math LLM raw response: {response}")
 
             try:
                 parsed = json.loads(response)
+                print(f"[DEBUG] Parsed JSON: {parsed}")
                 expr = parsed.get("expression", "").strip()
                 if expr:
+                    print(f"[DEBUG] Using CalculatorTool for expression: {expr}")
                     return "calculator", expr
                 else:
+                    print("[DEBUG] Expression missing in JSON, defaulting to search")
                     return "search", question
             except json.JSONDecodeError:
-                # fallback
+                print("[DEBUG] Invalid JSON from Math LLM, defaulting to search")
                 return "search", question
 
         else:
             # Factual question → use SearchTool
+            print("[DEBUG] Using SearchTool for factual question.")
             return "search", question
-
     
     def run(self, question: str):
         tool_name, expr_or_query = self.decide_tool_and_expr(question)

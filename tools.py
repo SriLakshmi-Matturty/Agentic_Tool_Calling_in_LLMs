@@ -15,7 +15,7 @@ class CalculatorTool:
 
 
 class SearchTool:
-    def __init__(self, serpapi_key=None, summarizer_model="mistralai/Mistral-7B-Instruct-v0.2"):
+    def __init__(self, serpapi_key=None, summarizer_model="TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
         self.serpapi_key = serpapi_key
         # Use the same model or a small one for summarization
         self.summarizer_llm = LocalLLM(model_name=summarizer_model)

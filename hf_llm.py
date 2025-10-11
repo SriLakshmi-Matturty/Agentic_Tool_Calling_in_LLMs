@@ -2,7 +2,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 import torch
 
 class LocalLLM:
-    def _init_(self, model_name: str = "mistralai/Mistral-7B-Instruct-v0.2", device: str = None):
+    def __init__(self, model_name: str = "mistralai/Mistral-7B-Instruct-v0.2", device: str = None):
         self.model_name = model_name
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 

@@ -4,95 +4,57 @@ from prompt_manager import PromptManager
 from hf_llm import LocalLLM
 
 class Agent:
-    def __init__(self, llm_model=None, serpapi_key=None, hf_token=None):
+    def _init_(self, llm_model=None, serpapi_key=None):
         self.tools = {
             "calculator": CalculatorTool(),
             "search": SearchTool(serpapi_key)
         }
-        self.llm = LocalLLM(model_name=llm_model, hf_token=hf_token)
+        self.llm = LocalLLM(model_name=llm_model)
 
     def decide_tool_and_expr(self, question: str):
-        """
-        Uses the LLM to decide whether the question is mathematical or factual.
-        If math, extracts a valid Python expression for CalculatorTool.
-        """
-    
+       
         simple_math_pattern = r"^[\d\s\.\+\-\*/\(\)]+$"
         if re.fullmatch(simple_math_pattern, question.replace(" ", "")):
             print(f"[DEBUG] Detected simple numeric expression: {question}")
             return "calculator", question
-    
-        # Stronger reasoning-aware prompt
+
         prompt = f"""
-    You are a precise reasoning assistant that classifies a question as "math" or "factual".
-    
-    If it is math:
-    1. Think step-by-step (internally) about how the quantities relate.
-    2. Produce a valid Python expression that represents the correct order of operations.
-    3. Use parentheses to make the intended logic explicit (e.g., ((16 - 3) - 4) * 2).
-    4. Do NOT compute the result, just generate the expression.
-    5. Your final answer MUST be in valid JSON format, nothing else.
-    
-    Examples:
-    Q: What is 2 + 3?
-    A: {{
-      "type": "math",
-      "expression": "2 + 3"
-    }}
-    
-    Q: Janet’s ducks lay 16 eggs per day. She eats three and bakes muffins with four. She sells the rest at $2 per egg. How much does she make?
-    A: {{
-      "type": "math",
-      "expression": "((16 - 3) - 4) * 2"
-    }}
-    
-    Q: Who is the president of India?
-    A: {{
-      "type": "factual",
-      "expression": null
-    }}
-    
-    Q: {question}
-    A:
-    """
-    
-        response = self.llm.generate(prompt, max_new_tokens=256).strip()
-        print(f"[DEBUG] Raw LLM response: {response}")
-    
-        import json
-        try:
-            json_text = re.search(r"\{.*\}", response, re.DOTALL)
-            if not json_text:
-                raise ValueError("No JSON found in response")
-    
-            data = json.loads(json_text.group())
-            q_type = data.get("type", "").lower()
-            expr = data.get("expression")
-    
-            if q_type == "math" and expr:
-                expr = expr.strip()
-    
-                # --- Auto-fix heuristic: if multiple '-' and '*' exist, add grouping ---
-                if re.search(r"-.*-", expr) and "*" in expr and "(" not in expr:
-                    parts = expr.split("*")
-                    left = parts[0].strip()
-                    right = "*".join(parts[1:]).strip()
-                    expr = f"({left}) * {right}"
-    
+Classify the question as 'math' or 'factual'.
+If it is math, provide "math" and valid Python expression for the calculator, do not calculate answer just give the regular expression only
+(Example: If the question is 
+1) What is 2*3? then provide "math, 2*3"
+2) Natalia sold clips to 48 of her friends in April, and then she sold half as many clips in May. How many clips did Natalia sell altogether in April and May? then provide "math, 48+(48/2)"
+3) Weng earns $12 an hour for babysitting. Yesterday, she just did 50 minutes of babysitting. How much did she earn?
+   then provide "math, (12/60)*50"
+4) Julie is reading a 120-page book. Yesterday, she was able to read 12 pages and today, she read twice as many pages as yesterday. If she wants to read half of the remaining pages tomorrow,
+   how many pages should she read? then provide "math, 120-(12+(12*2))"
+5) James writes a 3-page letter to 2 different friends twice a week.  How many pages does he write a year? then provide "math, ((3*2)*2)*52"
+).
+If it is factual then provide "factual, None".
+(Example: If the question is
+1) Who is President of America? then provide "factual, None"
+2) What is the captial of Australia? then provide "factual, None"
+3) What is the currency of India? then provide "factual, None"
+4) What is an AI? then provide "factual, None"
+5) Who is the synonym of happy? then provide "factual, None"
+).
+Do NOT generate extra questions or examples. Only give expression for the math question do not add extra questions to it.
+
+Q: {question}
+A:"""
+
+        response = self.llm.generate(prompt, max_new_tokens=64).strip()
+        print(f"[DEBUG] LLM response: {response}")
+
+        if "math" in response.lower():
+            expr_match = re.search(r"[\d\.\+\-\*/\(\)\s]+", response)
+            if expr_match:
+                expr = expr_match.group().strip()
                 print(f"[DEBUG] Extracted expression: {expr}")
                 return "calculator", expr
-    
-            elif q_type == "factual":
-                print("[DEBUG] Classified as factual.")
-                return "search", None
-    
-        except Exception as e:
-            print(f"[DEBUG] JSON parse error: {e}")
-            print("[DEBUG] Defaulting to search.")
-            return "search", None
-    
-        return "search", None
 
+        print("[DEBUG] Using SearchTool for factual question.")
+        return "search", None
 
     def run(self, question: str) -> str:
         tool_name, expr = self.decide_tool_and_expr(question)

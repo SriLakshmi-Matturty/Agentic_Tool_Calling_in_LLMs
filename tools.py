@@ -22,7 +22,7 @@ class CalculatorTool:
 class SearchTool:
     name = "search"
 
-    def _init_(self, serpapi_key):
+    def __init__(self, serpapi_key):
         self.api_key = serpapi_key
 
     def run(self, query: str) -> str:

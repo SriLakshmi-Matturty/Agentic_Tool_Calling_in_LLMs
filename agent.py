@@ -17,14 +17,25 @@ class Agent:
 
     def extract_expression_from_text(self, text: str) -> str:
         """
-        Extracts a safe mathematical expression from raw text if JSON fails.
-        Only allows digits, operators, parentheses, pi, and spaces.
+        Extracts a safe arithmetic expression from raw text if JSON fails.
+        Only digits, operators, parentheses, pi, and spaces.
         """
         pattern = r"[0-9\+\-\*/\.\(\)pi ]+"
         matches = re.findall(pattern, text)
         if matches:
-            expr = max(matches, key=len)  # longest match is likely correct
-            return expr.strip()
+            return max(matches, key=len).strip()  # longest match is likely correct
+        return None
+
+    def extract_json_from_text(self, text: str):
+        """
+        Extracts the first JSON object from the LLM output.
+        """
+        match = re.search(r'\{.*?\}', text, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group())
+            except json.JSONDecodeError:
+                return None
         return None
 
     def decide_tool_and_expr(self, question: str):
@@ -53,38 +64,34 @@ Question: {question}
 You are a math expression extractor.
 
 Instructions:
-1. DO NOT compute the answer.
-2. DO NOT include reasoning, explanations, or code.
-3. Respond ONLY in EXACT JSON format:
-   {{"type": "math", "expression": "<expression_here>"}}
-4. The expression must be a symbolic arithmetic expression only, using +, -, *, /, parentheses, pi, etc.
-5. Never output numeric results. Only symbolic expressions.
+1. Respond ONLY with a JSON object containing a symbolic expression.
+2. NEVER compute the answer.
+3. NEVER include explanations, reasoning, or code.
+4. Format exactly as: {{"type": "math", "expression": "<expression_here>"}}
+5. Use only +, -, *, /, parentheses, pi, numbers, and variables.
 
 Examples:
-
-Q: Natalia sold 48 clips in April, then half as many in May. Total clips?
-A: {{"type": "math", "expression": "48+(48/2)"}}
+Q: What is 2+3?
+A: {{"type": "math", "expression": "2+3"}}
 
 Q: Weng earns $12/hour. She worked 50 minutes. How much did she earn?
 A: {{"type": "math", "expression": "(12/60)*50"}}
-
-Q: What is 2+3?
-A: {{"type": "math", "expression": "2+3"}}
 
 Question: {question}
 """
             response = self.math_llm.generate(math_prompt, max_new_tokens=128).strip()
             print(f"[DEBUG] Math LLM raw response: {response}")
 
-            # Try JSON parsing first
-            try:
-                parsed = json.loads(response)
+            # Try extracting JSON first
+            parsed = self.extract_json_from_text(response)
+            if parsed:
                 expr = parsed.get("expression", "").strip()
                 if expr:
                     print(f"[DEBUG] Using CalculatorTool from JSON expression: {expr}")
                     return "calculator", expr
-            except json.JSONDecodeError:
-                print("[DEBUG] JSON parsing failed, trying regex fallback")
+            else:
+                # JSON not found, fallback to regex
+                print("[DEBUG] Could not extract JSON, trying regex fallback")
                 expr = self.extract_expression_from_text(response)
                 if expr:
                     print(f"[DEBUG] Using CalculatorTool from regex extracted expression: {expr}")

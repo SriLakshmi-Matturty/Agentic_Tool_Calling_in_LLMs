@@ -18,13 +18,12 @@ class SearchTool:
         self.api_key = serpapi_key
 
     def execute(self, query: str) -> str:
-         try:
-            # Call SerpAPI
+        try:
             url = "https://serpapi.com/search"
             params = {
                 "q": query,
                 "api_key": self.api_key,
-                "num": 3,  # top 3 results
+                "num": 3,
             }
             r = requests.get(url, params=params).json()
             snippets = []
@@ -35,5 +34,5 @@ class SearchTool:
             if not snippets:
                 return "No result found"
             return "\n".join(snippets)
-         except Exception as e:
-            return f"Search Error: {e}"
+        except Exception as e:
+            return f"Search Error: {e}"

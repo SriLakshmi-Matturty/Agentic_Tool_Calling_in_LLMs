@@ -3,11 +3,12 @@ import requests
 class CalculatorTool:
     def execute(self, expr: str) -> str:
         try:
-            safe_locals = {k: getattr(math, k) for k in dir(math) if not k.startswith("_")}
-            result = eval(expr, {"_builtins_": None}, safe_locals)
-            if isinstance(result, float) and result.is_integer():
-                result = int(result)
-            return str(result)
+            # Safe eval for arithmetic expressions
+            allowed_chars = "0123456789+-*/.() "
+            if not all(c in allowed_chars for c in expr):
+                return "Calculator Error: Invalid characters"
+            result = eval(expr)
+            return result
         except Exception as e:
             return f"Calculator Error: {e}"
 

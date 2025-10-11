@@ -1,4 +1,5 @@
 import requests
+from hf_llm import LocalLLM
 
 class CalculatorTool:
     def execute(self, expr: str) -> str:
@@ -14,25 +15,41 @@ class CalculatorTool:
 
 
 class SearchTool:
-    def __init__(self, serpapi_key=None):
-        self.api_key = serpapi_key
+    def __init__(self, serpapi_key=None, summarizer_model="mistralai/Mistral-7B-Instruct-v0.2"):
+        self.serpapi_key = serpapi_key
+        # Use the same model or a small one for summarization
+        self.summarizer_llm = LocalLLM(model_name=summarizer_model)
 
     def execute(self, query: str) -> str:
+        """Use SerpAPI to get a concise factual answer."""
         try:
             url = "https://serpapi.com/search"
-            params = {
-                "q": query,
-                "api_key": self.api_key,
-                "num": 3,
-            }
-            r = requests.get(url, params=params).json()
+            params = {"q": query, "api_key": self.serpapi_key}
+            resp = requests.get(url, params=params)
+            data = resp.json()
+
+            # Collect snippets from search results
             snippets = []
-            for res in r.get("organic_results", []):
-                snippet = res.get("snippet")
-                if snippet:
-                    snippets.append(snippet)
-            if not snippets:
-                return "No result found"
-            return "\n".join(snippets)
+            if "organic_results" in data:
+                for r in data["organic_results"][:5]:
+                    if "snippet" in r:
+                        snippets.append(r["snippet"])
+            text_block = " ".join(snippets)
+
+            # Ask LLM to compress / extract concise factual entity names
+            summarizer_prompt = f"""
+Extract only the short factual answer(s) for the question below, in a concise comma-separated list.
+Do not include explanations or long text.
+
+Question: {query}
+Context: {text_block}
+
+Example output:
+- If question: "What do Jamaican people speak?"
+  Output: Jamaican Patois, English
+"""
+            short_answer = self.summarizer_llm.generate(summarizer_prompt, max_new_tokens=64).strip()
+            return short_answer or text_block
+
         except Exception as e:
-            return f"Search Error: {e}"
+            return f"Search Error: {str(e)}"

@@ -23,8 +23,7 @@ class Agent:
         pattern = r"[0-9\+\-\*/\.\(\)pi ]+"
         matches = re.findall(pattern, text)
         if matches:
-            # Return the longest match (most likely the intended expression)
-            expr = max(matches, key=len)
+            expr = max(matches, key=len)  # longest match is likely correct
             return expr.strip()
         return None
 
@@ -48,27 +47,32 @@ Question: {question}
         classification = self.classifier_llm.generate(classifier_prompt, max_new_tokens=16).strip().lower()
         print(f"[DEBUG] Classifier output: {classification}")
 
-        # Step 2: if math, send to math LLM to extract expression
+        # Step 2: if math, send to math LLM to extract symbolic expression
         if "math" in classification:
             math_prompt = f"""
-You are a math expression extractor. 
+You are a math expression extractor.
 
-Rules:
-1. NEVER compute the numeric answer.
-2. Respond ONLY in JSON format: {{"type": "math", "expression": "<expression_here>"}}
-3. Do NOT give explanations, reasoning, or final answers.
-4. Output only the symbolic expression using standard arithmetic operators (+, -, *, /, parentheses, pi, etc.)
+Instructions:
+1. DO NOT compute the answer.
+2. DO NOT include reasoning, explanations, or code.
+3. Respond ONLY in EXACT JSON format:
+   {{"type": "math", "expression": "<expression_here>"}}
+4. The expression must be a symbolic arithmetic expression only, using +, -, *, /, parentheses, pi, etc.
+5. Never output numeric results. Only symbolic expressions.
 
 Examples:
-Q: Natalia sold 48 clips in April, then half as many in May. Total clips? 
+
+Q: Natalia sold 48 clips in April, then half as many in May. Total clips?
 A: {{"type": "math", "expression": "48+(48/2)"}}
 
-Q: Weng earns $12/hour. She worked 50 minutes. How much did she earn? 
+Q: Weng earns $12/hour. She worked 50 minutes. How much did she earn?
 A: {{"type": "math", "expression": "(12/60)*50"}}
+
+Q: What is 2+3?
+A: {{"type": "math", "expression": "2+3"}}
 
 Question: {question}
 """
-
             response = self.math_llm.generate(math_prompt, max_new_tokens=128).strip()
             print(f"[DEBUG] Math LLM raw response: {response}")
 

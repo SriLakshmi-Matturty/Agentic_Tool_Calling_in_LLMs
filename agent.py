@@ -51,13 +51,24 @@ Question: {question}
         # Step 2: if math, send to math LLM to extract expression
         if "math" in classification:
             math_prompt = f"""
-Extract the correct mathematical expression from the question below.
-Respond ONLY in JSON format:
-{{"type": "math", "expression": "<expression_here>"}}
-Do NOT add explanations.
+You are a math expression extractor. 
+
+Rules:
+1. NEVER compute the numeric answer.
+2. Respond ONLY in JSON format: {{"type": "math", "expression": "<expression_here>"}}
+3. Do NOT give explanations, reasoning, or final answers.
+4. Output only the symbolic expression using standard arithmetic operators (+, -, *, /, parentheses, pi, etc.)
+
+Examples:
+Q: Natalia sold 48 clips in April, then half as many in May. Total clips? 
+A: {{"type": "math", "expression": "48+(48/2)"}}
+
+Q: Weng earns $12/hour. She worked 50 minutes. How much did she earn? 
+A: {{"type": "math", "expression": "(12/60)*50"}}
 
 Question: {question}
 """
+
             response = self.math_llm.generate(math_prompt, max_new_tokens=128).strip()
             print(f"[DEBUG] Math LLM raw response: {response}")
 

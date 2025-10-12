@@ -19,61 +19,47 @@ class Agent:
         self.math_llm = LocalLLM(model_name=math_model)
 
     def decide_tool_and_expr(self, question: str):
-        """Classify with Mistral; extract expression with Qwen; sanitize & validate strictly."""
+        """
+        Decide which tool to use (math/search) and extract a valid expression
+        for math questions.
+        """
 
-        simple_math_pattern = r"^[\d\s\.\+\-\*/\(\)]+$"
-        if re.fullmatch(simple_math_pattern, question.replace(" ", "")):
-            print(f"[DEBUG] Detected simple numeric expression: {question}")
-            return "calculator", question
-
-        # 1️⃣ Step: Classification using Mistral
-        classify_prompt = (
-            "Classify the following question as 'math' or 'factual'.\n"
-            "If it is math, only write 'math'. If factual, only write 'factual'.\n\n"
-            f"Q: {question}\nA:"
-        )
-        classification = self.classifier_llm.generate(classify_prompt, max_new_tokens=10).strip().lower()
+        # Step 1: classify the question
+        classification = self.classifier_model.generate(f"Classify the question as 'math' or 'factual': {question}")
+        classification = classification.lower().strip()
         print(f"[DEBUG] Mistral classification: {classification}")
 
-        # If it's a math question
-        if "math" in classification:
-            # 2️⃣ Step: Extract math expression via Qwen
-            expression_prompt = f"""
-You are a math reasoning assistant. Convert this question into a valid Python mathematical expression (without units or $ signs).
+        # Step 2: If factual, return search tool
+        if "factual" in classification or "fact" in classification:
+            return "search", None
 
-Examples:
-- What is 2 plus 3? → 2+3
-- A pen costs 10 and a notebook costs 20. Total cost? → 10+20
-- Natalia sold 48 clips and half as many more. Total clips? → 48+(48/2)
-- A worker earns $15/hour and works 40 minutes. Earnings? → (15/60)*40
-- Priyansh bought 3 chocolates for $15. Cost for 25? → (15/3)*25
+        # Step 3: If math, extract expression using Qwen
+        qwen_output = self.math_model.generate(
+            f"Extract only the clean Python-style mathematical expression from this question: {question}"
+        )
+        print(f"[DEBUG] Raw Qwen output: {qwen_output!r}")
 
-Now convert:
-{question}
-Return ONLY the expression, nothing else.
-"""
-            raw_expr = self.math_llm.generate(expression_prompt, max_new_tokens=64).strip()
-            print(f"[DEBUG] Raw Qwen output: {repr(raw_expr)}")
+        # Step 4: Clean the expression
+        # Remove markdown, code blocks, explanations, etc.
+        expr = qwen_output
+        expr = re.sub(r"```.*?```", "", expr, flags=re.S)
+        expr = re.sub(r"[^\d\+\-\*\/\%\.\(\)\s]", "", expr)  # allow only math-safe chars
+        expr = expr.strip()
 
-            # 3️⃣ Step: Clean expression aggressively
-            expr = raw_expr
-            expr = expr.replace("$", "")  # remove currency symbols
-            expr = re.sub(r"[^0-9\+\-\*/\.\(\)]", "", expr)  # remove all non-math chars
-            expr = re.sub(r"\.{2,}", ".", expr)  # collapse multiple dots
-            expr = re.sub(r"^\.+|\.+$", "", expr)  # trim leading/trailing dots
-            print(f"[DEBUG] Cleaned expression: {repr(expr)}")
+        # Fix over-generation like '2+3.232+3'
+        expr = re.sub(r"(\d)\.(\d)", r"\1.\2", expr)  # preserve decimals
+        expr = re.sub(r"\.\d+\.", ".", expr)  # remove double dots
+        expr = re.sub(r"\s+", "", expr)  # remove spaces
 
-            # 4️⃣ Step: Validate strictly
-            valid_expr_pattern = r"^[\d\.\+\-\*/\(\)]+$"
-            if not expr or not re.fullmatch(valid_expr_pattern, expr):
-                print("[WARN] Invalid or nonsensical math expression. Switching to SearchTool.")
-                return "search", None
+        print(f"[DEBUG] Cleaned expression: '{expr}'")
 
-            return "calculator", expr
+        # Validate expression
+        if not re.fullmatch(r"^[\d\+\-\*\/\%\.\(\)]+$", expr):
+            print("[ERROR] Invalid expression format")
+            return "error", None
 
-        # 5️⃣ Default factual
-        print("[DEBUG] Classified as factual → using SearchTool.")
-        return "search", None
+        # Step 5: Return to calculator
+        return "calculator", expr
 
 
     def run(self, question: str) -> str:

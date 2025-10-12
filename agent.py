@@ -28,7 +28,7 @@ class Agent:
     
         # Step 1: classify using Mistral
         classification = self.classifier_llm.generate(
-            f"Classify the following question strictly as either 'math' or 'factual': {question}"
+            f"Classify the following question strictly as either 'math' or 'factual'. Do not give any explanation other than one word 'math' or 'factual': {question}"
         )
         classification = classification.lower().strip()
         print(f"[DEBUG] Mistral classification: {classification}")

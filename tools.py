@@ -15,41 +15,24 @@ class CalculatorTool:
 
 
 class SearchTool:
-    def __init__(self, serpapi_key=None, summarizer_model="TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
+    def __init__(self, serpapi_key=None):
         self.serpapi_key = serpapi_key
-        # Use the same model or a small one for summarization
-        self.summarizer_llm = LocalLLM(model_name=summarizer_model)
 
-    def execute(self, query: str) -> str:
-        """Use SerpAPI to get a concise factual answer."""
+    def execute(self, query: str):
+        """Use SerpAPI to fetch factual snippets only (no summarization)."""
         try:
             url = "https://serpapi.com/search"
             params = {"q": query, "api_key": self.serpapi_key}
             resp = requests.get(url, params=params)
             data = resp.json()
 
-            # Collect snippets from search results
             snippets = []
             if "organic_results" in data:
                 for r in data["organic_results"][:5]:
                     if "snippet" in r:
                         snippets.append(r["snippet"])
+
             text_block = " ".join(snippets)
-
-            # Ask LLM to compress / extract concise factual entity names
-            summarizer_prompt = f"""
-Extract only the short factual answer(s) for the question below, in a concise comma-separated list.
-Do not include explanations or long text.
-
-Question: {query}
-Context: {text_block}
-
-Example output:
-- If question: "What do Jamaican people speak?"
-  Output: Jamaican Patois, English
-"""
-            short_answer = self.summarizer_llm.generate(summarizer_prompt, max_new_tokens=64).strip()
-            return short_answer or text_block
-
+            return text_block or "No results found."
         except Exception as e:
             return f"Search Error: {str(e)}"

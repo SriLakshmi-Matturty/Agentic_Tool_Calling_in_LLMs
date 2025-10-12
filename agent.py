@@ -32,27 +32,6 @@ class Agent:
             expr = expr[:-1].strip()
         return expr
 
-    def classify_question(self, question: str) -> str:
-        """
-        Use classifier LLM and extract only the last occurrence of 'math' or 'factual'.
-        """
-        prompt = f"Classify as 'math' or 'factual'. Reply with only one word.\nQuestion: {question}"
-        response = self.classifier_llm.generate(prompt, max_new_tokens=16)
-        print(f"[DEBUG] Classifier raw output: {response}")
-
-        matches = re.findall(r"\b(math|factual)\b", response.lower())
-        if matches:
-            classification = matches[-1]
-            print(f"[DEBUG] Extracted classification: {classification}")
-            return classification
-
-        # fallback
-        print("[WARN] No clear classification found, using fallback rule.")
-        lower_q = question.lower()
-        if any(ch.isdigit() for ch in lower_q) or any(w in lower_q for w in ["sum", "add", "value", "solve", "x", "y", "area", "perimeter", "height"]):
-            return "math"
-        return "factual"
-
     # ---------- main logic ----------
     def decide_tool_and_expr(self, question: str):
         # quick numeric check
@@ -61,9 +40,18 @@ class Agent:
             return "calculator", question
 
         # classify
-        classification = self.classify_question(question)
+        classifier_prompt = f"""Classify as 'math' or 'factual'. Reply with only one word.\nQuestion: {question}
+        (Examples: 
+         1) What is 2+3? Answer: math
+         2) Who is President of America? Answer: factual
+         3) Julie is reading a 120-page book. Yesterday, she was able to read 12 pages and today, she read twice as many pages as yesterday. 
+            If she wants to read half of the remaining pages tomorrow, how many pages should she read? Answer: math
+         4) What is an AI? Answer: factual
+        """
+        classification = self.classifier_llm.generate(classifier_prompt, max_new_tokens=8).strip().lower()
+        print(f"[DEBUG] Classifier output: {classification}")
 
-        if classification == "math":
+        if "math" in classification:
             math_prompt = f"""
 You are a math expression extractor.
 Return ONLY a JSON with one key "expression".

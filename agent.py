@@ -1,169 +1,75 @@
-import re, json, math
+import re
 from tools import CalculatorTool, SearchTool
+from prompt_manager import PromptManager
 from hf_llm import LocalLLM
 
+
 class Agent:
-    def __init__(self, classifier_model=None, math_model=None, serpapi_key=None):
-        # Tools
+    def __init__(self, classifier_model="mistralai/Mistral-7B-Instruct-v0.2",
+                 math_model="Qwen/Qwen2.5-Math-1.5B-Instruct", serpapi_key=None):
         self.tools = {
             "calculator": CalculatorTool(),
             "search": SearchTool(serpapi_key)
         }
-        # LLMs
+
+        print("[INFO] Loading classifier (Mistral)...")
         self.classifier_llm = LocalLLM(model_name=classifier_model)
+
+        print("[INFO] Loading math reasoning model (Qwen)...")
         self.math_llm = LocalLLM(model_name=math_model)
 
-    # ---------- helpers ----------
-    def extract_json_from_text(self, text: str):
-        match = re.search(r"\{.*?\}", text, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group())
-            except json.JSONDecodeError:
-                return None
-        return None
-
-    def extract_expression_from_text(self, text: str):
-        pattern = r"[0-9\+\-\*/\.\(\)pi ]+"
-        matches = re.findall(pattern, text)
-        return max(matches, key=len).strip() if matches else None
-
-    def clean_expression(self, expr: str):
-        expr = expr.strip()
-        if expr.endswith("="):
-            expr = expr[:-1].strip()
-        return expr
-
-    # ---------- main logic ----------
     def decide_tool_and_expr(self, question: str):
-        # Quick numeric check
-        if re.fullmatch(r"^[\d\s\.\+\-\*/\(\)]+$", question.replace(" ", "")):
-            print(f"[DEBUG] Simple numeric expression detected: {question}")
+        """Use Mistral to classify; if math, use Qwen to extract expression."""
+
+        # Simple numeric expression quick check
+        simple_math_pattern = r"^[\d\s\.\+\-\*/\(\)]+$"
+        if re.fullmatch(simple_math_pattern, question.replace(" ", "")):
+            print(f"[DEBUG] Detected simple numeric expression: {question}")
             return "calculator", question
-    
-        # Classify
 
-        # classify using LLM
-        classifier_prompt = f"""
-        Classify the following question as 'math' or 'factual'.
-        Return ONLY a JSON object like: {{"type": "math"}} or {{"type": "factual"}}.
-        Do NOT include any explanations or extra text. Please please only give JSON format.
-        (Example: If the question is 
-         1) What is 2+3? then output {{"type": "math"}}
-         2) Julie is reading a 120-page book. Yesterday, she was able to read 12 pages and today, she read twice as many pages as yesterday.
-            If she wants to read half of the remaining pages tomorrow, how many pages should she read? then output {{"type": "math"}}
-        3) Who is President of America? then output {{"type": "factual"}}
-        4) What is the capital of Australia? then output {{"type": "factual"}}
-       ).
-       Please only give this format. Do not add anything before that JSON format. This prompt is to guide you. Do not give include this in output. Only give JSON output.
-        Question: {question}
-        """
-        
-        raw_class = self.classifier_llm.generate(classifier_prompt, max_new_tokens=16).strip()
-        print(f"[DEBUG] Classifier raw output: {raw_class}")
-        json_matches = re.findall(r'\{.*?\}', raw_class, re.DOTALL)
+        # 1️⃣ Step: Ask Mistral whether it's math or factual
+        classify_prompt = (
+            "Classify the following question as 'math' or 'factual'.\n"
+            "If it is math, only write 'math'. If factual, only write 'factual'.\n\n"
+            f"Q: {question}\nA:"
+        )
+        classification = self.classifier_llm.generate(classify_prompt, max_new_tokens=10).strip().lower()
+        print(f"[DEBUG] Mistral classification: {classification}")
 
-        if json_matches:
-            try:
-                # take the **last** one, since Mistral repeats the prompt examples before the final JSON
-                parsed = json.loads(json_matches[-1])
-                classification = parsed.get("type", "factual").lower()
-            except json.JSONDecodeError:
-                classification = "factual"
-        else:
-            # fallback if JSON parsing fails
-            if "math" in raw_class.lower():
-                classification = "math"
-            else:
-                classification = "factual"
-        
-        print(f"[DEBUG] Classifier final: {classification}")
+        if "math" in classification:
+            # 2️⃣ Step: Ask Qwen to extract the mathematical expression
+            expression_prompt = f"""
+You are a math reasoning assistant. Convert the following natural language question
+into a valid Python-style mathematical expression without calculating the result.
 
-    
-        if classification == "math.":
-            # Math LLM prompt with explicit JSON enforcement
-            math_prompt = f"""
-    Return ONLY a JSON object with key "expression".
-    Do NOT include explanations, reasoning, or any extra text.
-    Use only numbers, +, -, *, /, parentheses, and pi.
-    
-    Example:
-    Q: What is 2+3?
-    A: {{"expression": "2+3"}}
-    
-    Question: {question}
-    """
-            resp = self.math_llm.generate(math_prompt, max_new_tokens=128).strip()
-            print(f"[DEBUG] Math LLM raw response: {resp}")
-    
-            # Extract last JSON object from text
-            json_matches = re.findall(r"\{.*?\}", resp, re.DOTALL)
-            parsed = None
-            if json_matches:
-                for jm in reversed(json_matches):
-                    try:
-                        parsed = json.loads(jm)
-                        if "expression" in parsed:
-                            break
-                    except:
-                        continue
-    
-            if parsed and "expression" in parsed:
-                expr = self.clean_expression(parsed["expression"])
-                print(f"[DEBUG] Using CalculatorTool from JSON expression: {expr}")
-                return "calculator", expr
-    
-            # Regex fallback (digits, operators, parentheses, pi)
-            print("[DEBUG] Could not extract JSON, trying regex fallback")
-            expr = self.extract_expression_from_text(resp)
-            if expr:
-                # Strip unmatched parentheses
-                open_par = expr.count("(")
-                close_par = expr.count(")")
-                if open_par > close_par:
-                    expr += ")" * (open_par - close_par)
-                expr = self.clean_expression(expr)
-                print(f"[DEBUG] Using CalculatorTool from regex extracted expression: {expr}")
-                return "calculator", expr
-    
-            print("[DEBUG] Fallback to SearchTool")
-            return "search", question
-    
-        else:
-            print("[DEBUG] Using SearchTool for factual question.")
-            return "search", question
+Example conversions:
+1) What is 2 plus 3? → 2+3
+2) A pen costs 10 and a notebook costs 20. Total cost? → 10+20
+3) Natalia sold 48 clips to her friends and half as many more. Total clips? → 48+(48/2)
+4) A worker earns $15/hour and works 40 minutes. Earnings? → (15/60)*40
 
-    # ---------- optional summarizer for search ----------
-    def summarize_search(self, question: str, context: str) -> str:
-        prompt = f"""
-Extract only short factual answer(s) for the question below, in a concise comma-separated list.
-Do NOT include explanations or long text.
-
-Question: {question}
-Context: {context}
+Now convert this question:
+{question}
+Return ONLY the expression, nothing else.
 """
-        return self.classifier_llm.generate(prompt, max_new_tokens=64).strip()
+            expr = self.math_llm.generate(expression_prompt, max_new_tokens=64).strip()
+            expr = re.sub(r"[^0-9\+\-\*/\.\(\)\s]", "", expr)  # keep only valid symbols
+            print(f"[DEBUG] Qwen extracted expression: {expr}")
+            return "calculator", expr if expr else None
 
-    # ---------- run ----------
-    def run(self, question: str):
-        print(f"[INFO] Processing question: {question}")
+        print("[DEBUG] Classified as factual → using SearchTool.")
+        return "search", None
 
-        # Decide tool
-        tool_name, expr_or_query = self.decide_tool_and_expr(question)
-        print(f"[DEBUG] Tool selected: {tool_name}, expr/query: {expr_or_query}")
+    def run(self, question: str) -> str:
+        tool_name, expr = self.decide_tool_and_expr(question)
 
-        # Execute
-        tool = self.tools[tool_name]
         if tool_name == "calculator":
-            expr_or_query = expr_or_query.replace("pi", str(math.pi))
+            if expr:
+                print(f"[DEBUG] Sending to CalculatorTool: {expr}")
+                return self.tools["calculator"].run(expr)
+            return "Calculator: Unable to parse expression"
 
-        result = tool.execute(expr_or_query)
-        print(f"[DEBUG] Tool result: {result}")
-
-        # Summarize if search
         if tool_name == "search":
-            summarized = self.summarize_search(question, result)
-            print(f"[DEBUG] Summarized Search Result: {summarized}")
-            return summarized or result
+            return self.tools["search"].run(question)
 
-        return result
+        return "Unable to handle question"

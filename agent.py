@@ -42,10 +42,28 @@ class Agent:
             return "calculator", question
     
         # Classify
-        classifier_prompt = f"Classify as 'math' or 'factual'. Reply with only one word.\nQuestion: {question}"
-        classification = self.classifier_llm.generate(classifier_prompt, max_new_tokens=8).strip().lower()
-        classification = classification.split()[-1]  # take last word
+
+        # classify using LLM
+        classifier_prompt = f"""
+        Classify the following question as 'math' or 'factual'.
+        Return ONLY a JSON object like: {{"type": "math"}} or {{"type": "factual"}}.
+        Do NOT include any explanations or extra text.
+        
+        Question: {question}
+        """
+        
+        raw_class = self.classifier_llm.generate(classifier_prompt, max_new_tokens=16).strip()
+        print(f"[DEBUG] Classifier raw output: {raw_class}")
+        
+        # Extract JSON
+        try:
+            parsed = json.loads(raw_class)
+            classification = parsed.get("type", "factual").lower()
+        except:
+            classification = "factual"  # fallback
+        
         print(f"[DEBUG] Classifier final: {classification}")
+
     
         if classification == "math.":
             # Math LLM prompt with explicit JSON enforcement

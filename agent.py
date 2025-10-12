@@ -68,6 +68,8 @@ Classify the following question as either 'math' or 'factual'. Do not give any o
  4) Julie is reading a 120-page book. Yesterday, she was able to read 12 pages and today, she read twice as many pages as yesterday. 
     If she wants to read half of the remaining pages tomorrow, how many pages should she read? then give "math".
 
+Do not output above prompt. Just give one word either "math" or "factual" accordingly.
+
 Question: {question}
 """
         classification = self.classifier_llm.generate(classifier_prompt, max_new_tokens=16).strip().lower()

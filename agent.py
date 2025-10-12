@@ -61,13 +61,21 @@ class Agent:
         
         raw_class = self.classifier_llm.generate(classifier_prompt, max_new_tokens=16).strip()
         print(f"[DEBUG] Classifier raw output: {raw_class}")
-        
-        # Extract JSON
-        try:
-            parsed = json.loads(raw_class)
-            classification = parsed.get("type", "factual").lower()
-        except:
-            classification = "factual"  # fallback
+        json_matches = re.findall(r'\{.*?\}', raw_class, re.DOTALL)
+
+        if json_matches:
+            try:
+                # take the **last** one, since Mistral repeats the prompt examples before the final JSON
+                parsed = json.loads(json_matches[-1])
+                classification = parsed.get("type", "factual").lower()
+            except json.JSONDecodeError:
+                classification = "factual"
+        else:
+            # fallback if JSON parsing fails
+            if "math" in raw_class.lower():
+                classification = "math"
+            else:
+                classification = "factual"
         
         print(f"[DEBUG] Classifier final: {classification}")
 

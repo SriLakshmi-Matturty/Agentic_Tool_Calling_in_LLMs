@@ -32,6 +32,27 @@ class Agent:
             expr = expr[:-1].strip()
         return expr
 
+    def classify_question(self, question: str) -> str:
+        """
+        Use classifier LLM and extract only the last occurrence of 'math' or 'factual'.
+        """
+        prompt = f"Classify as 'math' or 'factual'. Reply with only one word.\nQuestion: {question}"
+        response = self.classifier_llm.generate(prompt, max_new_tokens=16)
+        print(f"[DEBUG] Classifier raw output: {response}")
+
+        matches = re.findall(r"\b(math|factual)\b", response.lower())
+        if matches:
+            classification = matches[-1]
+            print(f"[DEBUG] Extracted classification: {classification}")
+            return classification
+
+        # fallback
+        print("[WARN] No clear classification found, using fallback rule.")
+        lower_q = question.lower()
+        if any(ch.isdigit() for ch in lower_q) or any(w in lower_q for w in ["sum", "add", "value", "solve", "x", "y", "area", "perimeter", "height"]):
+            return "math"
+        return "factual"
+
     # ---------- main logic ----------
     def decide_tool_and_expr(self, question: str):
         # quick numeric check
@@ -40,11 +61,9 @@ class Agent:
             return "calculator", question
 
         # classify
-        classifier_prompt = f"Classify as 'math' or 'factual'. Reply with only one word.\nQuestion: {question}"
-        classification = self.classifier_llm.generate(classifier_prompt, max_new_tokens=8).strip().lower()
-        print(f"[DEBUG] Classifier output: {classification}")
+        classification = self.classify_question(question)
 
-        if "math" in classification:
+        if classification == "math":
             math_prompt = f"""
 You are a math expression extractor.
 Return ONLY a JSON with one key "expression".

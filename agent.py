@@ -7,6 +7,7 @@ from hf_llm import LocalLLM
 class Agent:
     def __init__(self, classifier_model="mistralai/Mistral-7B-Instruct-v0.2",
                  math_model="Qwen/Qwen2.5-Math-1.5B-Instruct", serpapi_key=None):
+
         self.tools = {
             "calculator": CalculatorTool(),
             "search": SearchTool(serpapi_key)
@@ -18,6 +19,7 @@ class Agent:
         print("[INFO] Loading math reasoning model (Qwen)...")
         self.math_llm = LocalLLM(model_name=math_model)
 
+
     def decide_tool_and_expr(self, question: str):
         """
         Decide which tool to use (math/search) and extract a valid expression
@@ -25,40 +27,41 @@ class Agent:
         """
 
         # Step 1: classify the question
-        classification = self.classifier_model.generate(f"Classify the question as 'math' or 'factual': {question}")
+        classification = self.classifier_llm.generate(
+            f"Classify the following question strictly as either 'math' or 'factual': {question}"
+        )
         classification = classification.lower().strip()
         print(f"[DEBUG] Mistral classification: {classification}")
 
-        # Step 2: If factual, return search tool
+        # Step 2: factual → Search Tool
         if "factual" in classification or "fact" in classification:
             return "search", None
 
-        # Step 3: If math, extract expression using Qwen
-        qwen_output = self.math_model.generate(
-            f"Extract only the clean Python-style mathematical expression from this question: {question}"
+        # Step 3: math → Qwen for expression extraction
+        qwen_output = self.math_llm.generate(
+            f"Extract ONLY the valid Python-style math expression (no words) from this question: {question}"
         )
         print(f"[DEBUG] Raw Qwen output: {qwen_output!r}")
 
         # Step 4: Clean the expression
-        # Remove markdown, code blocks, explanations, etc.
-        expr = qwen_output
-        expr = re.sub(r"```.*?```", "", expr, flags=re.S)
-        expr = re.sub(r"[^\d\+\-\*\/\%\.\(\)\s]", "", expr)  # allow only math-safe chars
+        expr = qwen_output or ""
+        expr = re.sub(r"```.*?```", "", expr, flags=re.S)   # remove code fences
+        expr = re.sub(r"[a-zA-Z=<>]", "", expr)             # remove letters or equality signs
+        expr = re.sub(r"[^\d\+\-\*\/\%\.\(\)\s]", "", expr) # allow only math chars
+        expr = re.sub(r"\s+", "", expr)                     # remove whitespace
         expr = expr.strip()
 
-        # Fix over-generation like '2+3.232+3'
-        expr = re.sub(r"(\d)\.(\d)", r"\1.\2", expr)  # preserve decimals
-        expr = re.sub(r"\.\d+\.", ".", expr)  # remove double dots
-        expr = re.sub(r"\s+", "", expr)  # remove spaces
+        # Handle over-generation like “2+3.232+3”
+        expr = re.sub(r"\.\.+", ".", expr)
+        expr = expr.replace("..", ".")
 
         print(f"[DEBUG] Cleaned expression: '{expr}'")
 
-        # Validate expression
-        if not re.fullmatch(r"^[\d\+\-\*\/\%\.\(\)]+$", expr):
-            print("[ERROR] Invalid expression format")
+        # Step 5: Validate expression
+        if not expr or not re.fullmatch(r"^[\d\+\-\*\/\%\.\(\)]+$", expr):
+            print("[ERROR] Invalid or empty expression")
             return "error", None
 
-        # Step 5: Return to calculator
         return "calculator", expr
 
 

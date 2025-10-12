@@ -40,44 +40,63 @@ class Agent:
         if re.fullmatch(r"^[\d\s\.\+\-\*/\(\)]+$", question.replace(" ", "")):
             print(f"[DEBUG] Simple numeric expression detected: {question}")
             return "calculator", question
-
-        # Classify as math or factual (extract last word only)
+    
+        # Classify
         classifier_prompt = f"Classify as 'math' or 'factual'. Reply with only one word.\nQuestion: {question}"
         classification = self.classifier_llm.generate(classifier_prompt, max_new_tokens=8).strip().lower()
-        print(f"[DEBUG] Classifier raw output: {classification}")
         classification = classification.split()[-1]  # take last word
         print(f"[DEBUG] Classifier final: {classification}")
-
-        if classification == "math.":
-            # Call math LLM only for math
+    
+        if classification == "math":
+            # Math LLM prompt with explicit JSON enforcement
             math_prompt = f"""
-Return ONLY a JSON with one key "expression".
-Do NOT include explanations or extra text.
-Use only +, -, *, /, numbers, parentheses, and pi.
-
-Question: {question}
-"""
+    Return ONLY a JSON object with key "expression".
+    Do NOT include explanations, reasoning, or any extra text.
+    Use only numbers, +, -, *, /, parentheses, and pi.
+    
+    Example:
+    Q: What is 2+3?
+    A: {{"expression": "2+3"}}
+    
+    Question: {question}
+    """
             resp = self.math_llm.generate(math_prompt, max_new_tokens=128).strip()
             print(f"[DEBUG] Math LLM raw response: {resp}")
-
-            parsed = self.extract_json_from_text(resp)
+    
+            # Extract last JSON object from text
+            json_matches = re.findall(r"\{.*?\}", resp, re.DOTALL)
+            parsed = None
+            if json_matches:
+                for jm in reversed(json_matches):
+                    try:
+                        parsed = json.loads(jm)
+                        if "expression" in parsed:
+                            break
+                    except:
+                        continue
+    
             if parsed and "expression" in parsed:
                 expr = self.clean_expression(parsed["expression"])
                 print(f"[DEBUG] Using CalculatorTool from JSON expression: {expr}")
                 return "calculator", expr
-
+    
+            # Regex fallback (digits, operators, parentheses, pi)
             print("[DEBUG] Could not extract JSON, trying regex fallback")
             expr = self.extract_expression_from_text(resp)
             if expr:
+                # Strip unmatched parentheses
+                open_par = expr.count("(")
+                close_par = expr.count(")")
+                if open_par > close_par:
+                    expr += ")" * (open_par - close_par)
                 expr = self.clean_expression(expr)
                 print(f"[DEBUG] Using CalculatorTool from regex extracted expression: {expr}")
                 return "calculator", expr
-
+    
             print("[DEBUG] Fallback to SearchTool")
             return "search", question
-
+    
         else:
-            # Factual question → use SearchTool
             print("[DEBUG] Using SearchTool for factual question.")
             return "search", question
 

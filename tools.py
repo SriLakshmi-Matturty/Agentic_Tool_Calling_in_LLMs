@@ -1,7 +1,7 @@
 import requests
 
 class CalculatorTool:
-    def execute(self, expr: str) -> str:
+    def run(self, expr: str) -> str:
         try:
             # Safe eval for arithmetic expressions
             allowed_chars = "0123456789+-*/.() "
@@ -17,7 +17,7 @@ class SearchTool:
     def __init__(self, serpapi_key=None):
         self.serpapi_key = serpapi_key
 
-    def execute(self, query: str):
+    def run(self, query: str):
         """Use SerpAPI to fetch factual snippets only (no summarization)."""
         try:
             url = "https://serpapi.com/search"

@@ -60,7 +60,13 @@ class Agent:
 
         # Step 1: classify question using classifier LLM
         classifier_prompt = f"""
-Classify the following question as either 'math' or 'factual'. Respond ONLY with 'math' or 'factual'.
+Classify the following question as either 'math' or 'factual'. Do not give any output other than "math" or "factual".
+(Examples:
+ 1) Who is President of America? then give "factual".
+ 2) What is 17*24? then give "math".
+ 3) What is AI? then give "factual".
+ 4) Julie is reading a 120-page book. Yesterday, she was able to read 12 pages and today, she read twice as many pages as yesterday. 
+    If she wants to read half of the remaining pages tomorrow, how many pages should she read? then give "math".
 
 Question: {question}
 """

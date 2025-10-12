@@ -47,7 +47,7 @@ class Agent:
         classification = classification.split()[-1]  # take last word
         print(f"[DEBUG] Classifier final: {classification}")
     
-        if classification == "math":
+        if classification == "math.":
             # Math LLM prompt with explicit JSON enforcement
             math_prompt = f"""
     Return ONLY a JSON object with key "expression".

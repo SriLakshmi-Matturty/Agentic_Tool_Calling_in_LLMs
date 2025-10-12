@@ -25,43 +25,58 @@ class Agent:
         Decide which tool to use (math/search) and extract a valid expression
         for math questions.
         """
-
-        # Step 1: classify the question
+    
+        # Step 1: classify using Mistral
         classification = self.classifier_llm.generate(
             f"Classify the following question strictly as either 'math' or 'factual': {question}"
         )
         classification = classification.lower().strip()
         print(f"[DEBUG] Mistral classification: {classification}")
-
-        # Step 2: factual → Search Tool
+    
+        # Step 2: if factual, return SearchTool
         if "factual" in classification or "fact" in classification:
             return "search", None
-
-        # Step 3: math → Qwen for expression extraction
+    
+        # Step 3: use Qwen to extract expression
         qwen_output = self.math_llm.generate(
-            f"Only give expression. Do not give explanation. Extract ONLY the valid Python-style math expression (no words) from this question: {question}"
+            f"Extract ONLY the valid Python-style math expression (no words, no explanation) from this question: {question}"
         )
         print(f"[DEBUG] Raw Qwen output: {qwen_output!r}")
-
-        # Step 4: Clean the expression
-        expr = qwen_output or ""
-        expr = re.sub(r"```.*?```", "", expr, flags=re.S)   # remove code fences
-        expr = re.sub(r"[a-zA-Z=<>]", "", expr)             # remove letters or equality signs
-        expr = re.sub(r"[^\d\+\-\*\/\%\.\(\)\s]", "", expr) # allow only math chars
-        expr = re.sub(r"\s+", "", expr)                     # remove whitespace
-        expr = expr.strip()
-
-        # Handle over-generation like “2+3.232+3”
+    
+        text = qwen_output or ""
+    
+       
+        expr = None
+    
+        
+        boxed_match = re.search(r"\\boxed\{([^}]*)\}", text)
+        if boxed_match:
+            expr = boxed_match.group(1).strip()
+    
+        
+        if not expr:
+            code_match = re.search(r"```(.*?)```", text, flags=re.S)
+            if code_match:
+                expr = code_match.group(1).strip()
+        if not expr:
+            backtick_match = re.search(r"`([^`]+)`", text)
+            if backtick_match:
+                expr = backtick_match.group(1).strip()
+    
+        if not expr:
+            cleaned = re.sub(r"[^0-9\+\-\*\/\%\.\(\)]", " ", text)
+            candidates = re.findall(r"[\d\.\+\-\*/\%\(\)]+", cleaned)
+            expr = max(candidates, key=len).strip() if candidates else ""
+    
+        
+        expr = re.sub(r"\s+", "", expr)
         expr = re.sub(r"\.\.+", ".", expr)
-        expr = expr.replace("..", ".")
-
-        print(f"[DEBUG] Cleaned expression: '{expr}'")
-
-        # Step 5: Validate expression
-        if not expr or not re.fullmatch(r"^[\d\+\-\*\/\%\.\(\)]+$", expr):
+        print(f"[DEBUG] Final extracted expression: '{expr}'")
+    
+        if not expr or not re.fullmatch(r"^[\d\.\+\-\*/\%\(\)]+$", expr):
             print("[ERROR] Invalid or empty expression")
             return "error", None
-
+    
         return "calculator", expr
 
 

@@ -39,7 +39,7 @@ class Agent:
 
         # Step 3: math → Qwen for expression extraction
         qwen_output = self.math_llm.generate(
-            f"Extract ONLY the valid Python-style math expression (no words) from this question: {question}"
+            f"Only give expression. Do not give explanation. Extract ONLY the valid Python-style math expression (no words) from this question: {question}"
         )
         print(f"[DEBUG] Raw Qwen output: {qwen_output!r}")
 

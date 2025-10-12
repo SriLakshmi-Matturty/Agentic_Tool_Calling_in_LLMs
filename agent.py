@@ -1,153 +1,131 @@
-import re
 import json
 from tools import CalculatorTool, SearchTool
+from prompt_manager import PromptManager
 from hf_llm import LocalLLM
 
-
 class Agent:
-    def __init__(self, classifier_model=None, math_model=None, serpapi_key=None):
-        # Tools
+    def __init__(self, classifier_model=None, math_model=None, serpapi_key=None, use_llm_for_fallback=True):
+        """
+        Agent orchestrates classification, tool selection, and post-processing.
+        """
+        self.use_llm_for_fallback = use_llm_for_fallback
         self.tools = {
             "calculator": CalculatorTool(),
-            "search": SearchTool(serpapi_key)
+            "search": SearchTool(serpapi_key),
         }
 
-        # LLMs
+        # Load models
         self.classifier_llm = LocalLLM(model_name=classifier_model)
         self.math_llm = LocalLLM(model_name=math_model)
+        self.fallback_llm = LocalLLM(model_name=classifier_model) if use_llm_for_fallback else None
 
-    # ------------------------ Helper Methods ------------------------
+    def classify_question(self, question: str) -> str:
+        """
+        Use the LLM classifier to decide if a question is 'math' or 'factual'.
+        Model must return JSON like {"type": "math"} or {"type": "factual"}.
+        """
+        prompt = f"""
+You are a strict question classifier.
+Classify the following question into one of two categories:
+1. "math" — if the question involves numbers, calculations, equations, or requires symbolic math reasoning.
+2. "factual" — if the question asks about people, places, events, definitions, or facts.
 
-    def extract_expression_from_text(self, text: str) -> str:
-        """Extracts arithmetic expression safely from text."""
-        pattern = r"[0-9\+\-\*/\.\(\)pi ]+"
-        matches = re.findall(pattern, text)
-        if matches:
-            return max(matches, key=len).strip()
-        return None
+Respond ONLY in strict JSON format like this:
+{{"type": "math"}} or {{"type": "factual"}}
 
-    def extract_json_from_text(self, text: str):
-        """Extract JSON object from LLM output."""
-        match = re.search(r'\{.*?\}', text, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group())
-            except json.JSONDecodeError:
-                return None
-        return None
+Examples:
+Q: What is 5+7?
+A: {{"type": "math"}}
 
-    def clean_expression(self, expr: str) -> str:
-        """Cleans extra symbols or spaces from expression."""
-        expr = expr.strip()
-        if expr.endswith('='):
-            expr = expr[:-1].strip()
-        return expr
+Q: Who is the Prime Minister of India?
+A: {{"type": "factual"}}
 
-    # ------------------------ Core Logic ------------------------
-
-    def decide_tool_and_expr(self, question: str):
-        """Decides which tool to call: calculator or search."""
-
-        # Step 0: Detect simple numeric expressions like "2+3"
-        simple_math_pattern = r"^[\d\s\.\+\-\*/\(\)]+$"
-        if re.fullmatch(simple_math_pattern, question.replace(" ", "")):
-            print(f"[DEBUG] Simple numeric expression detected: {question}")
-            return "calculator", question
-
-        # Step 1: Classify as math or factual
-        classifier_prompt = f"""
-You are a classifier that decides if a question is 'math' or 'factual'.
-Respond ONLY with one word: "math" or "factual".
-Do NOT explain or repeat the question.
+Q: If a train travels 120 km in 3 hours, what is its speed?
+A: {{"type": "math"}}
 
 Question: {question}
 Answer:
 """
-        classification = (
-            self.classifier_llm.generate(classifier_prompt, max_new_tokens=8)
-            .strip()
-            .lower()
-        )
+        response = self.classifier_llm.generate(prompt, max_new_tokens=50)
+        print(f"[DEBUG] Raw classifier output: {response}")
 
-        # Force sanitize LLM output
-        classification = "math" if "math" in classification else "factual"
-        print(f"[DEBUG] Classifier final decision: {classification}")
+        try:
+            parsed = json.loads(response.strip())
+            qtype = parsed.get("type", "").lower()
+            if qtype in ["math", "factual"]:
+                return qtype
+        except Exception:
+            pass
 
-        # Step 2: If math → extract symbolic expression
-        if classification == "math":
-            math_prompt = f"""
+        # If JSON parsing fails or output invalid
+        print("[WARN] Invalid JSON classification output. Falling back to keyword logic.")
+        lower_q = question.lower()
+        if any(ch.isdigit() for ch in lower_q) or any(w in lower_q for w in ["sum", "multiply", "add", "divide", "area", "value", "solve", "x", "y"]):
+            return "math"
+        return "factual"
+
+    def extract_math_expression(self, question: str) -> str:
+        """
+        Ask the math LLM to extract the symbolic expression.
+        """
+        prompt = f"""
 You are a math expression extractor.
 
-Rules:
-- Respond ONLY with a JSON object containing one key: "expression".
-- Do NOT compute the answer or include explanations.
-- Use only +, -, *, /, parentheses, pi, numbers, and variables.
-
-Example:
-Q: What is 2+3?
-A: {{"expression": "2+3"}}
-
-Q: Julie read 12 pages yesterday, today twice as many, half remaining tomorrow?
-A: {{"expression": "120-(12+12*2)/2"}}
+Instructions:
+1. Respond ONLY with a JSON object containing a symbolic expression.
+2. The JSON must have ONLY one key: "expression".
+   Example: {{"expression": "2+3"}}
+3. DO NOT compute the answer.
+4. DO NOT include explanations, reasoning, code, "result", or "=".
+5. Use only +, -, *, /, parentheses, pi, numbers, and variables.
 
 Question: {question}
 Answer:
 """
-            response = self.math_llm.generate(math_prompt, max_new_tokens=128).strip()
-            print(f"[DEBUG] Math LLM raw response: {response}")
+        response = self.math_llm.generate(prompt, max_new_tokens=150)
+        print(f"[DEBUG] Math LLM raw response: {response}")
 
-            parsed = self.extract_json_from_text(response)
-            if parsed and "expression" in parsed:
-                expr = self.clean_expression(parsed["expression"])
-                print(f"[DEBUG] Extracted expression: {expr}")
-                return "calculator", expr
-
-            # Fallback to regex
-            expr = self.extract_expression_from_text(response)
+        try:
+            data = json.loads(response.strip())
+            expr = data.get("expression", "").strip()
             if expr:
-                expr = self.clean_expression(expr)
-                print(f"[DEBUG] Fallback extracted expression: {expr}")
-                return "calculator", expr
-
-            # If nothing works
-            print("[DEBUG] Could not extract expression, defaulting to SearchTool")
-            return "search", question
-
-        # Step 3: Factual → use SearchTool
-        print("[DEBUG] Classified as factual → using SearchTool")
-        return "search", question
-
-    # ------------------------ Postprocessing ------------------------
-
-    def summarize_search(self, question: str, context: str) -> str:
-        """Summarizes search results concisely."""
-        prompt = f"""
-Provide a short, direct factual answer for the question below.
-No explanations or long text — just the key fact(s) in a comma-separated list.
-
-Question: {question}
-Context: {context}
-
-Example:
-Q: What do Jamaican people speak?
-A: Jamaican Patois, English
-"""
-        return self.classifier_llm.generate(prompt, max_new_tokens=64).strip()
-
-    # ------------------------ Main Execution ------------------------
+                return expr
+        except Exception:
+            pass
+        print("[WARN] Could not extract expression properly. Returning empty.")
+        return ""
 
     def run(self, question: str):
+        """
+        Main agent execution.
+        """
         print(f"[INFO] Processing question: {question}")
+        qtype = self.classify_question(question)
+        print(f"[DEBUG] Classified as: {qtype}")
 
-        tool_name, expr_or_query = self.decide_tool_and_expr(question)
-        print(f"[DEBUG] Tool selected: {tool_name}, expr/query: {expr_or_query}")
+        if qtype == "math":
+            expr = self.extract_math_expression(question)
+            print(f"[DEBUG] Extracted expression: {expr}")
+            if expr:
+                print(f"[DEBUG] Using CalculatorTool from JSON expression: {expr}")
+                result = self.tools["calculator"].run(expr)
+                print(f"[DEBUG] Tool selected: calculator, expr/query: {expr}")
+                print(f"[DEBUG] Tool result: {result}")
+                return result
+            else:
+                print("[WARN] No valid expression extracted. Falling back to LLM for final answer.")
+                return self.math_llm.generate(question, max_new_tokens=100)
 
-        result = self.tools[tool_name].execute(expr_or_query)
-        print(f"[DEBUG] Tool result: {result}")
+        elif qtype == "factual":
+            print(f"[DEBUG] Tool selected: search, query: {question}")
+            result = self.tools["search"].run(question)
+            print(f"[DEBUG] Tool result: {result}")
+            if self.use_llm_for_fallback and self.fallback_llm:
+                prompt = PromptManager.build_final_prompt(question, result)
+                print("[DEBUG] Using fallback LLM for post-processing factual answer.")
+                return self.fallback_llm.generate(prompt, max_new_tokens=200)
+            return result
 
-        if tool_name == "search":
-            summarized = self.summarize_search(question, result)
-            print(f"[DEBUG] Summarized Search Result: {summarized}")
-            return summarized or result
-
-        return result
+        else:
+            print(f"[WARN] Unknown classification '{qtype}', defaulting to factual search.")
+            return self.tools["search"].run(question)

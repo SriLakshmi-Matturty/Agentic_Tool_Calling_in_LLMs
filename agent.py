@@ -47,8 +47,15 @@ class Agent:
         classifier_prompt = f"""
         Classify the following question as 'math' or 'factual'.
         Return ONLY a JSON object like: {{"type": "math"}} or {{"type": "factual"}}.
-        Do NOT include any explanations or extra text.
-        
+        Do NOT include any explanations or extra text. Please please only give JSON format.
+        (Example: If the question is 
+         1) What is 2+3? then output {{"type": "math"}}
+         2) Julie is reading a 120-page book. Yesterday, she was able to read 12 pages and today, she read twice as many pages as yesterday.
+            If she wants to read half of the remaining pages tomorrow, how many pages should she read? then output {{"type": "math"}}
+        3) Who is President of America? then output {{"type": "factual"}}
+        4) What is the capital of Australia? then output {{"type": "factual"}}
+       ).
+       Please only give this format. Do not add anything before that JSON format.
         Question: {question}
         """
         

@@ -4,10 +4,12 @@ from hf_llm import LocalLLM
 
 class Agent:
     def __init__(self, classifier_model=None, math_model=None, serpapi_key=None):
+        # Tools
         self.tools = {
             "calculator": CalculatorTool(),
             "search": SearchTool(serpapi_key)
         }
+        # LLMs
         self.classifier_llm = LocalLLM(model_name=classifier_model)
         self.math_llm = LocalLLM(model_name=math_model)
 
@@ -34,29 +36,25 @@ class Agent:
 
     # ---------- main logic ----------
     def decide_tool_and_expr(self, question: str):
-        # quick numeric check
+        # Quick numeric check
         if re.fullmatch(r"^[\d\s\.\+\-\*/\(\)]+$", question.replace(" ", "")):
             print(f"[DEBUG] Simple numeric expression detected: {question}")
             return "calculator", question
 
-        # classify
-        classifier_prompt = f"""Classify as 'math' or 'factual'. Reply with only one word.\nQuestion: {question}
-        (Examples: 
-         1) What is 2+3? Answer: math
-         2) Who is President of America? Answer: factual
-         3) Julie is reading a 120-page book. Yesterday, she was able to read 12 pages and today, she read twice as many pages as yesterday. 
-            If she wants to read half of the remaining pages tomorrow, how many pages should she read? Answer: math
-         4) What is an AI? Answer: factual
-        """
+        # Classify as math or factual (extract last word only)
+        classifier_prompt = f"Classify as 'math' or 'factual'. Reply with only one word.\nQuestion: {question}"
         classification = self.classifier_llm.generate(classifier_prompt, max_new_tokens=8).strip().lower()
-        print(f"[DEBUG] Classifier output: {classification}")
+        print(f"[DEBUG] Classifier raw output: {classification}")
+        classification = classification.split()[-1]  # take last word
+        print(f"[DEBUG] Classifier final: {classification}")
 
-        if "math" in classification:
+        if classification == "math":
+            # Call math LLM only for math
             math_prompt = f"""
-You are a math expression extractor.
 Return ONLY a JSON with one key "expression".
-Example: {{"expression": "2+3"}}
-Do NOT compute or explain.
+Do NOT include explanations or extra text.
+Use only +, -, *, /, numbers, parentheses, and pi.
+
 Question: {question}
 """
             resp = self.math_llm.generate(math_prompt, max_new_tokens=128).strip()
@@ -77,16 +75,43 @@ Question: {question}
 
             print("[DEBUG] Fallback to SearchTool")
             return "search", question
+
         else:
+            # Factual question → use SearchTool
             print("[DEBUG] Using SearchTool for factual question.")
             return "search", question
 
+    # ---------- optional summarizer for search ----------
+    def summarize_search(self, question: str, context: str) -> str:
+        prompt = f"""
+Extract only short factual answer(s) for the question below, in a concise comma-separated list.
+Do NOT include explanations or long text.
+
+Question: {question}
+Context: {context}
+"""
+        return self.classifier_llm.generate(prompt, max_new_tokens=64).strip()
+
+    # ---------- run ----------
     def run(self, question: str):
+        print(f"[INFO] Processing question: {question}")
+
+        # Decide tool
         tool_name, expr_or_query = self.decide_tool_and_expr(question)
         print(f"[DEBUG] Tool selected: {tool_name}, expr/query: {expr_or_query}")
+
+        # Execute
         tool = self.tools[tool_name]
         if tool_name == "calculator":
             expr_or_query = expr_or_query.replace("pi", str(math.pi))
+
         result = tool.execute(expr_or_query)
         print(f"[DEBUG] Tool result: {result}")
+
+        # Summarize if search
+        if tool_name == "search":
+            summarized = self.summarize_search(question, result)
+            print(f"[DEBUG] Summarized Search Result: {summarized}")
+            return summarized or result
+
         return result

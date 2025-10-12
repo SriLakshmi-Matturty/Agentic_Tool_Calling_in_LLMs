@@ -129,7 +129,7 @@ Example:
 Q: What do Jamaican people speak?
 A: Jamaican Patois, English
 """
-        return self.llm.generate(prompt, max_new_tokens=64).strip()
+        return self.classifier_llm.generate(prompt, max_new_tokens=64).strip()
 
     def run(self, question: str):
         print(f"[INFO] Processing question: {question}")

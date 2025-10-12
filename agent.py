@@ -131,16 +131,22 @@ A: Jamaican Patois, English
 """
         return self.llm.generate(prompt, max_new_tokens=64).strip()
 
-    def run(self, query: str):
-        q_type = self.classify_question(query)
-        print(f"[DEBUG] Classified as: {q_type}")
-
-        if "math" in q_type:
-            expr = query.replace("Calculate", "").replace("Find", "").strip()
-            result = self.tools["calculator"].execute(expr)
-            return f"Answer: {result}"
-
-        else:
-            raw_result = self.tools["search"].execute(query)
-            concise = self.summarize_search(query, raw_result)
-            return concise or raw_result
+    def run(self, question: str):
+        print(f"[INFO] Processing question: {question}")
+    
+        # Step 1: Decide which tool and what query/expression to use
+        tool_name, expr_or_query = self.decide_tool_and_expr(question)
+        print(f"[DEBUG] Tool selected: {tool_name}, expr/query: {expr_or_query}")
+    
+        # Step 2: Execute the chosen tool
+        result = self.tools[tool_name].execute(expr_or_query)
+        print(f"[DEBUG] Tool result: {result}")
+    
+        # Step 3: If factual (search), summarize the result using same LLM
+        if tool_name == "search":
+            summarized = self.summarize_search(question, result)
+            print(f"[DEBUG] Summarized Search Result: {summarized}")
+            return summarized or result
+    
+        # Step 4: Otherwise (math/calculator), return the computed result
+        return result

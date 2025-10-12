@@ -55,7 +55,7 @@ class Agent:
         3) Who is President of America? then output {{"type": "factual"}}
         4) What is the capital of Australia? then output {{"type": "factual"}}
        ).
-       Please only give this format. Do not add anything before that JSON format.
+       Please only give this format. Do not add anything before that JSON format. This prompt is to guide you. Do not give include this in output. Only give JSON output.
         Question: {question}
         """
         

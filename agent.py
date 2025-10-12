@@ -116,15 +116,31 @@ Question: {question}
             print("[DEBUG] Using SearchTool for factual question.")
             return "search", question
 
-    def run(self, question: str):
-        tool_name, expr_or_query = self.decide_tool_and_expr(question)
-        print(f"[DEBUG] Tool selected: {tool_name}, expr/query: {expr_or_query}")
-        tool = self.tools[tool_name]
+    def summarize_search(self, question: str, context: str) -> str:
+        """Summarize long search results using same LLM."""
+        prompt = f"""
+Extract only the short factual answer(s) for the question below, in a concise comma-separated list.
+Do not include explanations or long sentences.
 
-        # Support pi in expressions
-        if tool_name == "calculator":
-            expr_or_query = expr_or_query.replace("pi", str(math.pi))
+Question: {question}
+Context: {context}
 
-        result = tool.execute(expr_or_query)
-        print(f"[DEBUG] Tool result: {result}")
-        return result
+Example:
+Q: What do Jamaican people speak?
+A: Jamaican Patois, English
+"""
+        return self.llm.generate(prompt, max_new_tokens=64).strip()
+
+    def run(self, query: str):
+        q_type = self.classify_question(query)
+        print(f"[DEBUG] Classified as: {q_type}")
+
+        if "math" in q_type:
+            expr = query.replace("Calculate", "").replace("Find", "").strip()
+            result = self.tools["calculator"].execute(expr)
+            return f"Answer: {result}"
+
+        else:
+            raw_result = self.tools["search"].execute(query)
+            concise = self.summarize_search(query, raw_result)
+            return concise or raw_result

@@ -3,7 +3,7 @@ from tools import CalculatorTool, SearchTool
 from hf_llm import LocalLLM
 
 class Agent:
-    def _init_(self, classifier_model=None, math_model=None, serpapi_key=None):
+    def __init__(self, classifier_model=None, math_model=None, serpapi_key=None):
         self.tools = {
             "calculator": CalculatorTool(),
             "search": SearchTool(serpapi_key)

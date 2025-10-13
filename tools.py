@@ -1,37 +1,46 @@
+import math
 import requests
+import wikipedia
+import re
+
+wikipedia.set_lang("en")
 
 class CalculatorTool:
+    name = "calculator"
+
     def run(self, expr: str) -> str:
         try:
-            # Safe eval for arithmetic expressions
-            allowed_chars = "0123456789+-*/.() "
-            if not all(c in allowed_chars for c in expr):
-                return "Calculator Error: Invalid characters"
-            result = eval(expr)
-            return result
+            safe_locals = {k: getattr(math, k) for k in dir(math) if not k.startswith("_")}
+            result = eval(expr, {"_builtins_": None}, safe_locals)
+            if isinstance(result, float) and result.is_integer():
+                result = int(result)
+            return str(result)
         except Exception as e:
             return f"Calculator Error: {e}"
 
 
 class SearchTool:
-    def __init__(self, serpapi_key=None):
-        self.serpapi_key = serpapi_key
+    name = "search"
 
-    def run(self, query: str):
-        """Use SerpAPI to fetch factual snippets only (no summarization)."""
+    def __init__(self, serpapi_key):
+        self.api_key = serpapi_key
+
+    def run(self, query: str) -> str:
         try:
             url = "https://serpapi.com/search"
-            params = {"q": query, "api_key": self.serpapi_key}
-            resp = requests.get(url, params=params)
-            data = resp.json()
-
+            params = {
+                "q": query,
+                "api_key": self.api_key,
+                "num": 3, 
+            }
+            r = requests.get(url, params=params).json()
             snippets = []
-            if "organic_results" in data:
-                for r in data["organic_results"][:5]:
-                    if "snippet" in r:
-                        snippets.append(r["snippet"])
-
-            text_block = " ".join(snippets)
-            return text_block or "No results found."
+            for res in r.get("organic_results", []):
+                snippet = res.get("snippet")
+                if snippet:
+                    snippets.append(snippet)
+            if not snippets:
+                return "No result found"
+            return "\n".join(snippets)
         except Exception as e:
-            return f"Search Error: {str(e)}"
+            return f"Search Error: {e}"

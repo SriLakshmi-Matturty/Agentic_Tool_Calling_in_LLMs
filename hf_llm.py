@@ -4,23 +4,43 @@ import torch
 
 class LocalLLM:
     def __init__(self, model_name: str, device: str = None):
+
         self.model_name = model_name
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-
+    
         print(f"[INFO] Loading model {model_name} on {self.device}...")
+    
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-            device_map="auto"
-        )
+    
+        # Load model based on device choice
+        if self.device == "cpu":
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                torch_dtype=torch.float32,
+                device_map=None
+            ).to("cpu")
+    
+            self.pipe = pipeline(
+                "text-generation",
+                model=self.model,
+                tokenizer=self.tokenizer,
+                device=-1  # -1 means CPU in Hugging Face
+            )
+    
+        else:  # GPU path
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                torch_dtype=torch.float16,
+                device_map="auto"
+            )
+    
+            self.pipe = pipeline(
+                "text-generation",
+                model=self.model,
+                tokenizer=self.tokenizer,
+                device_map="auto"
+            )
 
-        self.pipe = pipeline(
-            "text-generation",
-            model=self.model,
-            tokenizer=self.tokenizer,
-            device_map="auto"
-        )
 
     def generate(self, prompt: str, max_new_tokens: int = 128) -> str:
         output = self.pipe(

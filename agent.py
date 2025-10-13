@@ -28,7 +28,10 @@ class Agent:
     
         # Step 1: classify using Mistral
         classification = self.classifier_llm.generate(
-            f"Classify the following question strictly as either 'math' or 'factual'. Do not give any explanation other than one word 'math' or 'factual': {question}"
+            f"""Classify the following question strictly as either 'math' or 'factual'. Do not give any explanation other than one word 'math' or 'factual'.
+            (Examples: If the question is "Julie is reading a 120-page book. Yesterday, she was able to read 12 pages and today, she read twice as many pages as yesterday. If she wants to read half of the remaining pages tomorrow, how many pages should she read?"
+             then you should only give "math" or if the question is "What is the currency of India?" then you should only give "factual". )
+            : {question}"""
         )
         classification = classification.lower().strip()
         print(f"[DEBUG] Mistral classification: {classification}")
@@ -39,7 +42,10 @@ class Agent:
     
         # Step 3: use Qwen to extract expression
         qwen_output = self.math_llm.generate(
-            f"Extract ONLY the valid Python-style math expression (no words, no explanation) from this question. Do not give any explanations. Only give pthon expression : {question}"
+            f"""Extract ONLY the valid Python-style math expression (no words, no explanation) from this question. Do not give any explanations. Only give pthon expression.
+            (Example: If the question is "What is 2*3?" the your output should just be "2*3" or if the question is Julie is reading a 120-page book. Yesterday, she was able to read 12 pages and today, she read twice as many pages as yesterday. If she wants to read half of the remaining pages tomorrow, how many pages should she read?
+            then your output should just be "(120-12-2*12)/2".)
+            : {question}"""
         )
         print(f"[DEBUG] Raw Qwen output: {qwen_output!r}")
     

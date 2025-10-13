@@ -4,7 +4,7 @@ from prompt_manager import PromptManager
 from hf_llm import LocalLLM
 
 class Agent:
-    def __init__(self, llm_model=None, serpapi_key=None, , hf_token=None):
+    def __init__(self, llm_model=None, serpapi_key=None, hf_token=None):
         self.tools = {
             "calculator": CalculatorTool(),
             "search": SearchTool(serpapi_key)

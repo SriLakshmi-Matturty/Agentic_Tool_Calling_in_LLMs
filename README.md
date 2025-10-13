@@ -15,11 +15,15 @@ A Python project that integrates a **Large Language Model (LLM)** with external 
 ---
 
 ## Folder Structure
-''' sh
-├── agent.py # Main Agent class that handles question routing
-├── hf_llm.py # Local LLM wrapper using Hugging Face Transformers
-├── tools.py # CalculatorTool and SearchTool implementations
-├── prompt_manager.py # Prompts for summarization and final answer generation
-├── requirements.txt # Python dependencies
-└── README.md # Project documentation
-'''
+
+```sh
+├── agent.py # Main Agent class that handles question routing  
+└── hf_llm.py # Local LLM wrapper using Hugging Face Transformers
+└── prompt_manager.py # Prompts for final answer generation
+└── tools.py # CalculatorTool and SearchTool implementations
+└── requirements.txt # Python dependencies
+└── .gitignore
+└── Readme.md         
+```
+
+---

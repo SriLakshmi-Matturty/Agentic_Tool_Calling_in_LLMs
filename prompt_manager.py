@@ -2,11 +2,11 @@ class PromptManager:
     @staticmethod
     def build_final_prompt(question: str, tool_result_summary: str) -> str:
         """
-        Formats the final prompt for LLM synthesis after tool calls.
+        Minimal prompt for LLM to synthesize a final answer from tool output.
         """
         return (
-            f"Use ONLY the information below (do not invent facts).\n\n"
+            f"Use ONLY the information below to answer the question.\n\n"
             f"Tool output:\n{tool_result_summary}\n\n"
             f"Question: {question}\n\n"
-            f"Answer:"
+            f"Write a concise factual answer."
         )

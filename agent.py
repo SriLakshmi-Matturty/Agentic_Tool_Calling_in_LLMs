@@ -3,99 +3,92 @@ from tools import CalculatorTool, SearchTool
 from prompt_manager import PromptManager
 from hf_llm import LocalLLM
 
-
 class Agent:
-    def __init__(self, classifier_model="mistralai/Mistral-7B-Instruct-v0.2",
-                 math_model="Qwen/Qwen2.5-Math-1.5B-Instruct", serpapi_key=None):
-
+    def __init__(self, llm_model=None, serpapi_key=None):
         self.tools = {
             "calculator": CalculatorTool(),
             "search": SearchTool(serpapi_key)
         }
-
-        print("[INFO] Loading classifier (Mistral)...")
-        self.classifier_llm = LocalLLM(model_name=classifier_model)
-
-        print("[INFO] Loading math reasoning model (Qwen)...")
-        self.math_llm = LocalLLM(model_name=math_model, device="cpu")
-
+        self.llm = LocalLLM(model_name=llm_model)
+        self.tool_calls = 0
 
     def decide_tool_and_expr(self, question: str):
-        """
-        Decide which tool to use (math/search) and extract a valid expression
-        for math questions.
-        """
-    
-        # Step 1: classify using Mistral
-        classification = self.classifier_llm.generate(
-            f"""Classify the following question strictly as either 'math' or 'factual'. Do not give any explanation other than one word 'math' or 'factual'.
-            (Examples: If the question is "Julie is reading a 120-page book. Yesterday, she was able to read 12 pages and today, she read twice as many pages as yesterday. If she wants to read half of the remaining pages tomorrow, how many pages should she read?"
-             then you should only give "math" or if the question is "What is the currency of India?" then you should only give "factual". )
-            : {question}"""
-        )
-        classification = classification.lower().strip()
-        print(f"[DEBUG] Mistral classification: {classification}")
-    
-        # Step 2: if factual, return SearchTool
-        if "factual" in classification or "fact" in classification:
-            return "search", None
-    
-        # Step 3: use Qwen to extract expression
-        qwen_output = self.math_llm.generate(
-            f"""Extract ONLY the valid Python-style math expression (no words, no explanation) from this question. Do not give any explanations. Only give pthon expression.
-            (Example: If the question is "What is 2*3?" the your output should just be "2*3" or if the question is Julie is reading a 120-page book. Yesterday, she was able to read 12 pages and today, she read twice as many pages as yesterday. If she wants to read half of the remaining pages tomorrow, how many pages should she read?
-            then your output should just be "(120-12-2*12)/2".)
-            : {question}"""
-        )
-        print(f"[DEBUG] Raw Qwen output: {qwen_output!r}")
-    
-        text = qwen_output or ""
-    
        
-        expr = None
-    
-        
-        boxed_match = re.search(r"\\boxed\{([^}]*)\}", text)
-        if boxed_match:
-            expr = boxed_match.group(1).strip()
-    
-        
-        if not expr:
-            code_match = re.search(r"```(.*?)```", text, flags=re.S)
-            if code_match:
-                expr = code_match.group(1).strip()
-        if not expr:
-            backtick_match = re.search(r"`([^`]+)`", text)
-            if backtick_match:
-                expr = backtick_match.group(1).strip()
-    
-        if not expr:
-            cleaned = re.sub(r"[^0-9\+\-\*\/\%\.\(\)]", " ", text)
-            candidates = re.findall(r"[\d\.\+\-\*/\%\(\)]+", cleaned)
-            expr = max(candidates, key=len).strip() if candidates else ""
-    
-        
-        expr = re.sub(r"\s+", "", expr)
-        expr = re.sub(r"\.\.+", ".", expr)
-        print(f"[DEBUG] Final extracted expression: '{expr}'")
-    
-        if not expr or not re.fullmatch(r"^[\d\.\+\-\*/\%\(\)]+$", expr):
-            print("[ERROR] Invalid or empty expression")
-            return "error", None
-    
-        return "calculator", expr
+        simple_math_pattern = r"^[\d\s\.\+\-\*/\(\)]+$"
+        if re.fullmatch(simple_math_pattern, question.replace(" ", "")):
+            print(f"[DEBUG] Detected simple numeric expression: {question}")
+            return "calculator", question
 
+        prompt = f"""
+Classify the question as 'math' or 'factual'.
+If it is math, provide "math" and valid Python expression for the calculator, do not calculate answer just give the regular expression only
+(Example: If the question is 
+1) What is 2*3? then provide "math, 2*3"
+2) Natalia sold clips to 48 of her friends in April, and then she sold half as many clips in May. How many clips did Natalia sell altogether in April and May? then provide "math, 48+(48/2)"
+3) Weng earns $12 an hour for babysitting. Yesterday, she just did 50 minutes of babysitting. How much did she earn?
+   then provide "math, (12/60)*50"
+4) Julie is reading a 120-page book. Yesterday, she was able to read 12 pages and today, she read twice as many pages as yesterday. If she wants to read half of the remaining pages tomorrow,
+   how many pages should she read? then provide "math, 120-(12+(12*2))"
+5) James writes a 3-page letter to 2 different friends twice a week.  How many pages does he write a year? then provide "math, ((3*2)*2)*52"
+).
+If it is factual then provide "factual, None".
+(Example: If the question is
+1) Who is President of America? then provide "factual, None"
+2) What is the captial of Australia? then provide "factual, None"
+3) What is the currency of India? then provide "factual, None"
+4) What is an AI? then provide "factual, None"
+5) Who is the synonym of happy? then provide "factual, None"
+).
+Do NOT generate extra questions or examples. Only give expression for the math question do not add extra questions to it.
+
+Q: {question}
+A:"""
+
+        response = self.llm.generate(prompt, max_new_tokens=64).strip()
+        print(f"[DEBUG] LLM response: {response}")
+
+        if "math" in response.lower():
+            expr_match = re.search(r"[\d\.\+\-\*/\(\)\s]+", response)
+            if expr_match:
+                expr = expr_match.group().strip()
+                print(f"[DEBUG] Extracted expression: {expr}")
+                return "calculator", expr
+
+        print("[DEBUG] Using SearchTool for factual question.")
+        return "search", None
 
     def run(self, question: str) -> str:
+        """
+        Main execution pipeline:
+        1. Classify & extract expression
+        2. Use appropriate tool
+        3. Optionally summarize factual results via LLM
+        """
+        self.tool_calls = 0
+        print(f"[INFO] Processing question: {question}")
         tool_name, expr = self.decide_tool_and_expr(question)
 
         if tool_name == "calculator":
+            self.tool_calls += 1
             if expr:
                 print(f"[DEBUG] Sending to CalculatorTool: {expr}")
-                return self.tools["calculator"].run(expr)
-            return "Calculator: Unable to parse expression"
+                result = self.tools["calculator"].run(expr)
+                return result
+            return "Calculator Error: Unable to extract valid expression."
 
         if tool_name == "search":
-            return self.tools["search"].run(question)
+            self.tool_calls += 1
+            raw_context = self.tools["search"].run(question)
+            print(f"[DEBUG] Raw SearchTool output: {raw_context}")
+
+            # Build summarization prompt
+            summary_prompt = PromptManager.build_final_prompt(
+                question=question,
+                tool_result_summary=raw_context
+            )
+
+            summarized = self.llm.generate(summary_prompt, max_new_tokens=128).strip()
+            print(f"[DEBUG] Summarized answer: {summarized}")
+            return summarized or raw_context
 
         return "Unable to handle question"

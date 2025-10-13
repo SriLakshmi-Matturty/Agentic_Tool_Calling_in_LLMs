@@ -17,7 +17,7 @@ class Agent:
         self.classifier_llm = LocalLLM(model_name=classifier_model)
 
         print("[INFO] Loading math reasoning model (Qwen)...")
-        self.math_llm = LocalLLM(model_name=math_model)
+        self.math_llm = LocalLLM(model_name=math_model, device="cpu")
 
 
     def decide_tool_and_expr(self, question: str):

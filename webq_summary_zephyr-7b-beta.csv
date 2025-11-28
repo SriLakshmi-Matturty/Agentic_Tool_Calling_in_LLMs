@@ -1,2 +1,0 @@
-Dataset,Model_Name,Baseline Accuracy,Agent Accuracy,Avg Tool Calls
-WebQuestions (Factual),zephyr-7b-beta,1.0,1.0,1.0

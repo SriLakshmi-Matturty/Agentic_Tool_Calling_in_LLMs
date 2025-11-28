@@ -1,2 +1,0 @@
-Dataset,Model,Agent Accuracy,Baseline Accuracy,Avg Tool Calls
-GSM8K (Math),zephyr-7b-beta,0.07,0.01,1.0
